@@ -34,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvLogs: TextView
     private lateinit var scrollLogs: ScrollView
     private lateinit var btnClearLogs: ImageView
+    private lateinit var btnCopyLogs: ImageView
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
@@ -56,6 +57,19 @@ class MainActivity : AppCompatActivity() {
         tvLogs = findViewById(R.id.tvLogs)
         scrollLogs = findViewById(R.id.scrollLogs)
         btnClearLogs = findViewById(R.id.btnClearLogs)
+        btnCopyLogs = findViewById(R.id.btnCopyLogs)
+
+        btnCopyLogs.setOnClickListener {
+            val text = LogBuffer.getAllLogsText()
+            if (text.isNotBlank()) {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = android.content.ClipData.newPlainText("VolumeTweakLogs", text)
+                clipboard.setPrimaryClip(clip)
+                android.widget.Toast.makeText(this, "Logs copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                android.widget.Toast.makeText(this, "No logs to copy", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
 
         val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
 

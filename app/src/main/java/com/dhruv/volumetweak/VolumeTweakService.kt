@@ -2,10 +2,11 @@ package com.dhruv.volumetweak
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.content.ComponentName
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioManager
-import android.media.session.MediaSessionManager
+import android.media.AudioPlaybackConfiguration
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
@@ -36,6 +37,9 @@ class VolumeTweakService : AccessibilityService() {
     // Session memory to support resume when music was paused via tweak
     private var lastTweakActionTime: Long = 0
 
+    // Actively detected playing media app
+    private var detectedPlayingPackage: String? = null
+
     companion object {
         var testModeEnabled: Boolean = false
         var glyphReactionEnabled: Boolean = false
@@ -45,7 +49,7 @@ class VolumeTweakService : AccessibilityService() {
         private const val DUAL_PRESS_WINDOW_MS = 140L  // Window for simultaneous press
         private const val DEFER_SINGLE_PRESS_MS = 85L  // Deferral for initial key
         private const val GESTURE_TIMEOUT_MS = 360L    // Multi-click accumulation window
-        private const val PAUSE_SESSION_TIMEOUT_MS = 600000L // 10 minutes session retention
+        private const val PAUSE_SESSION_TIMEOUT_MS = 20000L // 20s session retention for resume
     }
 
     override fun onCreate() {
@@ -56,7 +60,40 @@ class VolumeTweakService : AccessibilityService() {
         wakeLock?.setReferenceCounted(false)
         GlyphController.init(this)
         HapticFeedbackController.init(this)
+        registerAudioPlaybackMonitoring()
         LogBuffer.log("Service created and ready")
+    }
+
+    private fun registerAudioPlaybackMonitoring() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                audioManager.registerAudioPlaybackCallback(object : AudioManager.AudioPlaybackCallback() {
+                    override fun onPlaybackConfigChanged(configs: List<AudioPlaybackConfiguration>) {
+                        super.onPlaybackConfigChanged(configs)
+                        var foundActivePkg: String? = null
+                        for (config in configs) {
+                            if (config.isActive && config.audioAttributes.usage == AudioAttributes.USAGE_MEDIA) {
+                                val uids = config.clientUid
+                                val pkgs = packageManager.getPackagesForUid(uids)
+                                if (!pkgs.isNullOrEmpty()) {
+                                    foundActivePkg = pkgs[0]
+                                    break
+                                }
+                            }
+                        }
+                        if (foundActivePkg != null && foundActivePkg != detectedPlayingPackage) {
+                            detectedPlayingPackage = foundActivePkg
+                            LogBuffer.log("[AUDIO] Active media source: $foundActivePkg")
+                        } else if (foundActivePkg == null && detectedPlayingPackage != null) {
+                            detectedPlayingPackage = null
+                            LogBuffer.log("[AUDIO] Media playback ended")
+                        }
+                    }
+                }, handler)
+            } catch (e: Exception) {
+                LogBuffer.log("[AUDIO] Callback init note: ${e.message}")
+            }
+        }
     }
 
     override fun onServiceConnected() {
@@ -97,10 +134,11 @@ class VolumeTweakService : AccessibilityService() {
 
         val currentTime = SystemClock.uptimeMillis()
         val isMusicActive = audioManager.isMusicActive
-        val isRecentPauseSession = (currentTime - lastTweakActionTime) < PAUSE_SESSION_TIMEOUT_MS
+        val timeSinceLastAction = currentTime - lastTweakActionTime
+        val isRecentPauseSession = timeSinceLastAction < PAUSE_SESSION_TIMEOUT_MS
         val isEligibleMediaState = isMusicActive || isRecentPauseSession || testModeEnabled
 
-        // Verify Whitelist if configured
+        // Verify Whitelist against detected playing app or fallback
         val passesWhitelist = isAppWhitelisted()
 
         val isEnabledForAction = isEligibleMediaState && passesWhitelist
@@ -110,7 +148,12 @@ class VolumeTweakService : AccessibilityService() {
 
         if (!isEnabledForAction) {
             if (action == KeyEvent.ACTION_DOWN) {
-                LogBuffer.log("$keyName $actionName [Bypass: Inactive / Whitelist]")
+                val reason = when {
+                    !isEligibleMediaState -> "Audio not active (isMusicActive=false, recent=${isRecentPauseSession})"
+                    !passesWhitelist -> "Playing app '${detectedPlayingPackage ?: "unknown"}' not in whitelist (${targetAppPackages.size} apps allowed)"
+                    else -> "Bypassed"
+                }
+                LogBuffer.log("[BYPASS] $keyName $actionName ($reason)")
             }
             isVolUpPressed = false
             isVolDownPressed = false
@@ -135,7 +178,7 @@ class VolumeTweakService : AccessibilityService() {
             // Simultaneous dual-press detection
             if (isVolUpPressed && isVolDownPressed && timeDiff <= DUAL_PRESS_WINDOW_MS) {
                 isDualPressConsumed = true
-                LogBuffer.log("[DUAL PRESS] Detected (diff: ${timeDiff}ms)")
+                LogBuffer.log("[DUAL PRESS] Detected (diff: ${timeDiff}ms, app: ${detectedPlayingPackage ?: "Media"})")
                 cancelPendingSinglePress()
                 registerDualClick()
                 return true
@@ -170,14 +213,14 @@ class VolumeTweakService : AccessibilityService() {
         if (targetAppPackages.isEmpty() || testModeEnabled) {
             return true
         }
-        return try {
-            val mediaSessionManager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
-            val component = ComponentName(this, VolumeTweakService::class.java)
-            val sessions = mediaSessionManager.getActiveSessions(component)
-            sessions.any { targetAppPackages.contains(it.packageName) }
-        } catch (e: Exception) {
-            true // Fallback to allow if notification listener permission is not granted
+
+        val pkg = detectedPlayingPackage
+        if (pkg != null) {
+            return targetAppPackages.contains(pkg)
         }
+
+        // Fallback: If detectedPlayingPackage is temporarily null but music is active, allow or match
+        return true
     }
 
     private fun scheduleDeferredSinglePress(keyCode: Int) {
