@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Volume Button Tweak</string>
+    <string name="accessibility_service_description">Intercepts simultaneous volume key presses during media playback to trigger playback controls (Play/Pause, Next Track, Previous Track).</string>
+    <string name="service_status_label">Accessibility Service Status</string>
+    <string name="status_enabled">ENABLED</string>
+    <string name="status_disabled">DISABLED</string>
+    <string name="enable_service_button">Enable Accessibility Service</string>
+    <string name="instructions_title">How it Works</string>
+    <string name="instruction_1">• 1 Dual Click (Vol Up + Down): Play / Pause</string>
+    <string name="instruction_2">• 2 Dual Clicks: Next Song</string>
+    <string name="instruction_3">• 3 or 4 Dual Clicks: Previous Song</string>
+    <string name="instruction_note">Note: Only active while music is playing or active in session.</string>
+</resources>
