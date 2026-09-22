@@ -6,7 +6,6 @@ import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Log
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 
@@ -21,7 +20,9 @@ class VolumeTweakService : AccessibilityService() {
     private var isVolUpPressed = false
     private var isVolDownPressed = false
 
-    private var isDualPressConsumed = false
+    private var pendingSinglePressRunnable: Runnable? = null
+    private var pendingSinglePressKeyCode: Int = 0
+
     private var clickCount = 0
     private var pendingGestureRunnable: Runnable? = null
 
@@ -29,24 +30,22 @@ class VolumeTweakService : AccessibilityService() {
     private var lastTweakActionTime: Long = 0
 
     companion object {
-        private const val TAG = "VolumeTweakService"
-        private const val DUAL_PRESS_WINDOW_MS = 110L  // Max ms between Vol Up and Vol Down presses
+        private const val DUAL_PRESS_WINDOW_MS = 140L  // Window to register simultaneous press
+        private const val DEFER_SINGLE_PRESS_MS = 90L   // Time window to wait before processing single volume key
         private const val GESTURE_TIMEOUT_MS = 380L    // Timeout window to count multi-clicks
-        private const val PAUSE_SESSION_TIMEOUT_MS = 600000L // 10 minutes session retention for resume
+        private const val PAUSE_SESSION_TIMEOUT_MS = 600000L // 10 min session memory
     }
 
     override fun onCreate() {
         super.onCreate()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        Log.d(TAG, "VolumeTweakService initialized")
+        LogBuffer.log("Service created and ready")
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Pure key event service, no accessibility event processing needed
-    }
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
 
     override fun onInterrupt() {
-        Log.d(TAG, "VolumeTweakService interrupted")
+        LogBuffer.log("Service interrupted")
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
@@ -61,11 +60,10 @@ class VolumeTweakService : AccessibilityService() {
         val isMusicActive = audioManager.isMusicActive
         val isRecentPauseSession = (currentTime - lastTweakActionTime) < PAUSE_SESSION_TIMEOUT_MS
 
-        // Only intercept key presses if music is playing or within an active media session
+        // If music is NOT active and no active session, let normal volume control work completely untouched
         if (!isMusicActive && !isRecentPauseSession) {
             isVolUpPressed = false
             isVolDownPressed = false
-            isDualPressConsumed = false
             return false
         }
 
@@ -73,24 +71,32 @@ class VolumeTweakService : AccessibilityService() {
             if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
                 isVolUpPressed = true
                 lastVolUpTime = currentTime
+                LogBuffer.log("Vol UP Pressed")
             } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
                 isVolDownPressed = true
                 lastVolDownTime = currentTime
+                LogBuffer.log("Vol DOWN Pressed")
             }
 
             val timeDiff = Math.abs(lastVolUpTime - lastVolDownTime)
 
-            // Dual press condition: both buttons currently down within threshold
+            // Check if BOTH keys are pressed within DUAL_PRESS_WINDOW_MS
             if (isVolUpPressed && isVolDownPressed && timeDiff <= DUAL_PRESS_WINDOW_MS) {
-                isDualPressConsumed = true
-                registerDualClick()
-                return true // Consume event to prevent system volume change
-            }
+                LogBuffer.log("⚡ DUAL PRESS DETECTED (diff: ${timeDiff}ms)")
+                
+                // Cancel any pending single volume press action
+                cancelPendingSinglePress()
 
-            // Check if the current press is close to previous opposite key press
-            if (isDualPressConsumed) {
+                // Register dual click
+                registerDualClick()
                 return true
             }
+
+            // This is the FIRST key of a potential dual press.
+            // Cancel previous pending single press, and schedule a deferred single volume action
+            cancelPendingSinglePress()
+            scheduleDeferredSinglePress(keyCode)
+            return true
 
         } else if (action == KeyEvent.ACTION_UP) {
             if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
@@ -98,25 +104,47 @@ class VolumeTweakService : AccessibilityService() {
             } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
                 isVolDownPressed = false
             }
-
-            if (isDualPressConsumed) {
-                // When both keys are released, reset consumption flag
-                if (!isVolUpPressed && !isVolDownPressed) {
-                    isDualPressConsumed = false
-                }
-                return true // Consume UP event of dual press
-            }
+            return true
         }
 
-        // Single key press passed through normally
-        return false
+        return true
+    }
+
+    private fun scheduleDeferredSinglePress(keyCode: Int) {
+        pendingSinglePressKeyCode = keyCode
+        val runnable = Runnable {
+            LogBuffer.log("Single Vol (${if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) "UP" else "DOWN"})")
+            adjustVolume(keyCode)
+            pendingSinglePressRunnable = null
+        }
+        pendingSinglePressRunnable = runnable
+        handler.postDelayed(runnable, DEFER_SINGLE_PRESS_MS)
+    }
+
+    private fun cancelPendingSinglePress() {
+        pendingSinglePressRunnable?.let {
+            handler.removeCallbacks(it)
+            pendingSinglePressRunnable = null
+        }
+    }
+
+    private fun adjustVolume(keyCode: Int) {
+        val direction = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+            AudioManager.ADJUST_RAISE
+        } else {
+            AudioManager.ADJUST_LOWER
+        }
+        audioManager.adjustStreamVolume(
+            AudioManager.STREAM_MUSIC,
+            direction,
+            AudioManager.FLAG_SHOW_UI
+        )
     }
 
     private fun registerDualClick() {
         clickCount++
         lastTweakActionTime = SystemClock.uptimeMillis()
 
-        // Cancel previous pending gesture evaluation
         pendingGestureRunnable?.let { handler.removeCallbacks(it) }
 
         val runnable = Runnable {
@@ -130,20 +158,20 @@ class VolumeTweakService : AccessibilityService() {
     private fun dispatchGestureAction(clicks: Int) {
         when (clicks) {
             1 -> {
-                Log.d(TAG, "Triggered 1 Click: Play/Pause Media")
+                LogBuffer.log("▶️ 1 Click: Play / Pause")
                 sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
             }
             2 -> {
-                Log.d(TAG, "Triggered 2 Clicks: Next Track")
+                LogBuffer.log("⏭️ 2 Clicks: Next Track")
                 sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_NEXT)
             }
             3, 4 -> {
-                Log.d(TAG, "Triggered $clicks Clicks: Previous Track")
+                LogBuffer.log("⏮️ $clicks Clicks: Previous Track")
                 sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
             }
             else -> {
                 if (clicks > 4) {
-                    Log.d(TAG, "Triggered $clicks Clicks: Previous Track")
+                    LogBuffer.log("⏮️ $clicks Clicks: Previous Track")
                     sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
                 }
             }
