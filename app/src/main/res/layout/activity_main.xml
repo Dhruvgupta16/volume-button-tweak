@@ -19,7 +19,7 @@
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="16dp"
         app:cardBackgroundColor="@color/card_bg"
         app:cardCornerRadius="16dp"
         app:cardElevation="0dp"
@@ -57,13 +57,22 @@
                 android:textColor="@color/white"
                 app:backgroundTint="@color/red_accent"
                 app:cornerRadius="10dp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchTestMode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Test Mode (bypass music check)"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="12dp"
         app:cardBackgroundColor="@color/card_bg"
         app:cardCornerRadius="16dp"
         app:cardElevation="0dp"
@@ -113,7 +122,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="12dp"
         app:cardBackgroundColor="@color/card_bg"
         app:cardCornerRadius="16dp"
         app:cardElevation="0dp"
@@ -163,7 +172,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
-                    android:text="No events captured yet. Play music and press volume buttons."
+                    android:text="Waiting for button events..."
                     android:textColor="#4CAF50"
                     android:textSize="11sp" />
             </ScrollView>

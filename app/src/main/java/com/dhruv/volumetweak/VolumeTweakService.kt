@@ -1,6 +1,7 @@
 package com.dhruv.volumetweak
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.media.AudioManager
 import android.os.Handler
@@ -30,8 +31,10 @@ class VolumeTweakService : AccessibilityService() {
     private var lastTweakActionTime: Long = 0
 
     companion object {
-        private const val DUAL_PRESS_WINDOW_MS = 140L  // Window to register simultaneous press
-        private const val DEFER_SINGLE_PRESS_MS = 90L   // Time window to wait before processing single volume key
+        var testModeEnabled: Boolean = false
+
+        private const val DUAL_PRESS_WINDOW_MS = 160L  // Forgiving window for simultaneous press
+        private const val DEFER_SINGLE_PRESS_MS = 90L  // Wait window before adjusting normal volume
         private const val GESTURE_TIMEOUT_MS = 380L    // Timeout window to count multi-clicks
         private const val PAUSE_SESSION_TIMEOUT_MS = 600000L // 10 min session memory
     }
@@ -40,6 +43,18 @@ class VolumeTweakService : AccessibilityService() {
         super.onCreate()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         LogBuffer.log("Service created and ready")
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        try {
+            val info = serviceInfo ?: AccessibilityServiceInfo()
+            info.flags = info.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
+            serviceInfo = info
+            LogBuffer.log("Accessibility Service connected & Key Filter active!")
+        } catch (e: Exception) {
+            LogBuffer.log("Service connect warning: ${e.message}")
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
@@ -59,9 +74,16 @@ class VolumeTweakService : AccessibilityService() {
         val currentTime = SystemClock.uptimeMillis()
         val isMusicActive = audioManager.isMusicActive
         val isRecentPauseSession = (currentTime - lastTweakActionTime) < PAUSE_SESSION_TIMEOUT_MS
+        val isEnabledForAction = isMusicActive || isRecentPauseSession || testModeEnabled
 
-        // If music is NOT active and no active session, let normal volume control work completely untouched
-        if (!isMusicActive && !isRecentPauseSession) {
+        val keyName = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) "Vol UP" else "Vol DOWN"
+        val actionName = if (action == KeyEvent.ACTION_DOWN) "DOWN" else "UP"
+
+        // If music is NOT active and not in test mode, log and let normal volume control work untouched
+        if (!isEnabledForAction) {
+            if (action == KeyEvent.ACTION_DOWN) {
+                LogBuffer.log("$keyName $actionName (Music inactive -> normal volume)")
+            }
             isVolUpPressed = false
             isVolDownPressed = false
             return false
@@ -82,8 +104,8 @@ class VolumeTweakService : AccessibilityService() {
 
             // Check if BOTH keys are pressed within DUAL_PRESS_WINDOW_MS
             if (isVolUpPressed && isVolDownPressed && timeDiff <= DUAL_PRESS_WINDOW_MS) {
-                LogBuffer.log("⚡ DUAL PRESS DETECTED (diff: ${timeDiff}ms)")
-                
+                LogBuffer.log("⚡ DUAL PRESS DETECTED (diff: ${timeDiff}ms)!")
+
                 // Cancel any pending single volume press action
                 cancelPendingSinglePress()
 
@@ -113,7 +135,7 @@ class VolumeTweakService : AccessibilityService() {
     private fun scheduleDeferredSinglePress(keyCode: Int) {
         pendingSinglePressKeyCode = keyCode
         val runnable = Runnable {
-            LogBuffer.log("Single Vol (${if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) "UP" else "DOWN"})")
+            LogBuffer.log("Normal Vol (${if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) "UP" else "DOWN"})")
             adjustVolume(keyCode)
             pendingSinglePressRunnable = null
         }

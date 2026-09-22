@@ -11,11 +11,13 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.materialswitch.MaterialSwitch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvStatus: TextView
     private lateinit var btnEnableService: MaterialButton
+    private lateinit var switchTestMode: MaterialSwitch
     private lateinit var tvLogs: TextView
     private lateinit var scrollLogs: ScrollView
     private lateinit var btnClearLogs: TextView
@@ -26,9 +28,21 @@ class MainActivity : AppCompatActivity() {
 
         tvStatus = findViewById(R.id.tvStatus)
         btnEnableService = findViewById(R.id.btnEnableService)
+        switchTestMode = findViewById(R.id.switchTestMode)
         tvLogs = findViewById(R.id.tvLogs)
         scrollLogs = findViewById(R.id.scrollLogs)
         btnClearLogs = findViewById(R.id.btnClearLogs)
+
+        val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+        val isTestMode = prefs.getBoolean("test_mode", false)
+        switchTestMode.isChecked = isTestMode
+        VolumeTweakService.testModeEnabled = isTestMode
+
+        switchTestMode.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("test_mode", isChecked).apply()
+            VolumeTweakService.testModeEnabled = isChecked
+            LogBuffer.log("Test mode: ${if (isChecked) "ON (music check bypassed)" else "OFF (music required)"}")
+        }
 
         btnEnableService.setOnClickListener {
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
@@ -45,7 +59,7 @@ class MainActivity : AppCompatActivity() {
         updateServiceStatus()
         LogBuffer.setListener { logList ->
             if (logList.isEmpty()) {
-                tvLogs.text = "No events captured yet. Play music and press volume buttons."
+                tvLogs.text = "Waiting for button events..."
             } else {
                 tvLogs.text = logList.joinToString("\n")
                 scrollLogs.post {
