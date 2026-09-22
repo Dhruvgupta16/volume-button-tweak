@@ -66,7 +66,10 @@ class MainActivity : AppCompatActivity() {
         switchHaptic.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("haptic_feedback", isChecked).apply()
             VolumeTweakService.hapticReactionEnabled = isChecked
-            LogBuffer.log("Haptic feedback: ${if (isChecked) "ENABLED" else "DISABLED"}")
+            if (isChecked) {
+                HapticFeedbackController.vibrate(this, 1)
+            }
+            LogBuffer.log("Haptic feedback: ${if (isChecked) "ENABLED (tested 1 pulse)" else "DISABLED"}")
         }
 
         // Test Mode Switch
@@ -131,17 +134,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun showAppPickerDialog() {
         val pm = packageManager
-        val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
-            addCategory(Intent.CATEGORY_LAUNCHER)
-        }
-        val resolveInfos = pm.queryIntentActivities(mainIntent, 0)
+        val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
 
         val appList = mutableListOf<AppItem>()
-        for (ri in resolveInfos) {
-            val pkg = ri.activityInfo.packageName
+        for (app in installedApps) {
+            val pkg = app.packageName
             if (pkg == packageName) continue
-            val label = ri.loadLabel(pm).toString()
-            appList.add(AppItem(label, pkg))
+            val launchIntent = pm.getLaunchIntentForPackage(pkg)
+            if (launchIntent != null) {
+                val label = pm.getApplicationLabel(app).toString()
+                appList.add(AppItem(label, pkg))
+            }
         }
 
         // Sort alphabetically

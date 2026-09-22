@@ -230,7 +230,7 @@ class VolumeTweakService : AccessibilityService() {
         }
 
         if (hapticReactionEnabled) {
-            HapticFeedbackController.vibrate(clicks)
+            HapticFeedbackController.vibrate(this, clicks)
         }
 
         when (clicks) {
