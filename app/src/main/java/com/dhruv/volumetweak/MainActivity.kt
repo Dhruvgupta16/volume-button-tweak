@@ -46,6 +46,19 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         tvStatus = findViewById(R.id.tvStatus)
+        val tvAppVersion: TextView = findViewById(R.id.tvAppVersion)
+        try {
+            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            val vName = pInfo.versionName
+            val vCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                pInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION") pInfo.versionCode.toLong()
+            }
+            tvAppVersion.text = "v$vName (Build $vCode)"
+        } catch (e: Exception) {
+            tvAppVersion.text = "v1.5 (Build 6)"
+        }
         btnEnableService = findViewById(R.id.btnEnableService)
         tvRamUsage = findViewById(R.id.tvRamUsage)
         tvCpuUsage = findViewById(R.id.tvCpuUsage)

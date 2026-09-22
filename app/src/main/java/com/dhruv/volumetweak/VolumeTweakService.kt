@@ -73,11 +73,18 @@ class VolumeTweakService : AccessibilityService() {
                         var foundActivePkg: String? = null
                         for (config in configs) {
                             if (config.isActive && config.audioAttributes.usage == AudioAttributes.USAGE_MEDIA) {
-                                val uids = config.clientUid
-                                val pkgs = packageManager.getPackagesForUid(uids)
-                                if (!pkgs.isNullOrEmpty()) {
-                                    foundActivePkg = pkgs[0]
-                                    break
+                                val uid = try {
+                                    val method = config.javaClass.getMethod("getClientUid")
+                                    method.invoke(config) as? Int
+                                } catch (e: Exception) {
+                                    null
+                                }
+                                if (uid != null) {
+                                    val pkgs = packageManager.getPackagesForUid(uid)
+                                    if (!pkgs.isNullOrEmpty()) {
+                                        foundActivePkg = pkgs[0]
+                                        break
+                                    }
                                 }
                             }
                         }
