@@ -1,51 +1,43 @@
-# Volume Button Tweak 🎵📱
+# Volume Button Tweak
 
-An ultra-lightweight, zero-bloat Android accessibility utility designed specifically for **Nothing Phone (2a)** (and compatible with Android 8.0+ / Nothing OS). 
-
-It converts simultaneous hardware Volume Up + Volume Down key presses ("Dual Click") into media controls **ONLY** while music is playing or active in a session.
+A low-footprint Android accessibility utility designed for Nothing OS and Android 8.0+. It maps simultaneous hardware Volume Up and Volume Down key presses to media control commands during active audio playback.
 
 ---
 
-## ⚡ Features & Gesture Controls
+## Control Mapping
 
-| Gesture | Action | System KeyEvent |
+| Action | Hardware Trigger | Android KeyEvent |
 | :--- | :--- | :--- |
-| **1 Dual Click** (Vol Up + Down) | Pause / Resume Song | `KEYCODE_MEDIA_PLAY_PAUSE` |
-| **2 Dual Clicks** | Next Song | `KEYCODE_MEDIA_NEXT` |
-| **3 or 4 Dual Clicks** | Previous Song | `KEYCODE_MEDIA_PREVIOUS` |
+| Play / Pause | 1 Simultaneous Press (Vol Up + Down) | `KEYCODE_MEDIA_PLAY_PAUSE` |
+| Next Track | 2 Simultaneous Presses | `KEYCODE_MEDIA_NEXT` |
+| Previous Track | 3 Simultaneous Presses | `KEYCODE_MEDIA_PREVIOUS` |
+| Volume Adjustment | Normal Hold or Single Tap | Stock Android Volume Handling |
 
 ---
 
-## 🔒 Smart Execution & Efficiency
-- **Active Only When Music Plays**: Uses `AudioManager.isMusicActive` to dynamically bypass volume key interception when no music is playing. Single volume button presses work completely normally!
-- **Negligible Resource Usage**: ~10–15 MB RAM consumption, 0% CPU background drain (runs purely on Android's event dispatcher loop without polling).
-- **Nothing OS Dark Aesthetic**: UI designed with a clean, dark theme matching Nothing OS styling.
+## Architectural Details
+
+### Input Dispatch & Key Filtering
+- Utilizes the Android Accessibility Service framework (`flagRequestFilterKeyEvents`, `canRequestFilterKeyEvents="true"`).
+- Evaluates key events with a 140ms simultaneous press threshold.
+- Normal press-and-hold volume ramping is preserved by checking `KeyEvent.repeatCount > 0` and delegating unhandled events directly to the operating system.
+
+### Resource Utilization
+- Average Process Memory: 10 to 14 MB (PSS).
+- Background CPU Utilization: Below 0.1% (event-driven execution without active polling threads).
+- Screen-Off Pocket Operation: Employs a transient partial wake lock during media key dispatch to guarantee responsiveness while the display is powered off.
+
+### Hardware Reaction
+- Integrated with Nothing Phone (2a) rear light interface via `CameraManager` torch control to deliver visual feedback pulses on successful gesture execution.
+
+### App Target Filtering
+- Optional target filtering restricts gesture handling exclusively to designated applications (such as YouTube Music or Spotify) or all active media sessions.
 
 ---
 
-## 🚀 Setup & Installation
+## Installation & Setup
 
-### Option 1: Build APK with Gradle
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/Dhruvgupta16/volume-button-tweak.git
-   cd volume-button-tweak
-   ```
-2. Open in Android Studio or build via terminal:
-   ```bash
-   ./gradlew assembleRelease
-   ```
-3. Install the APK onto your Nothing Phone (2a).
-
-### Option 2: Enable Accessibility Permission
-1. Launch the **Volume Button Tweak** app on your phone.
-2. Tap **Enable Accessibility Service**.
-3. In System Accessibility Settings, locate **Volume Button Tweak** and toggle it **ON**.
-4. Play music in your favorite app (Spotify, YouTube Music, Apple Music, etc.) and enjoy dual-click volume button control!
-
----
-
-## 🛠 Tech Stack
-- **Language**: 100% Kotlin
-- **SDK Level**: Min SDK 26 (Android 8.0), Target SDK 34 (Android 14)
-- **Core API**: Android `AccessibilityService` (`flagRequestFilterKeyEvents`)
+1. Download the latest release APK from GitHub Actions artifacts or releases.
+2. Install the package on the device.
+3. Launch the application and select **Enable Accessibility Service**.
+4. In system settings, navigate to **Installed apps > Volume Button Tweak** and toggle the service on.
