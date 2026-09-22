@@ -74,7 +74,7 @@
                         android:layout_marginStart="6dp"
                         android:text="RAM: -- MB"
                         android:textColor="#D0D0D0"
-                        android:textSize="12sp" />
+                        android:textSize="11.5sp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -97,7 +97,7 @@
                         android:layout_marginStart="6dp"
                         android:text="CPU: &lt; 0.1%"
                         android:textColor="#D0D0D0"
-                        android:textSize="12sp" />
+                        android:textSize="11.5sp" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -111,99 +111,6 @@
                 android:textSize="13sp"
                 app:backgroundTint="#E50914"
                 app:cornerRadius="8dp" />
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <!-- Gesture Legend Card with Icons -->
-    <com.google.android.material.card.MaterialCardView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        app:cardBackgroundColor="#141414"
-        app:cardCornerRadius="14dp"
-        app:strokeColor="#242424"
-        app:strokeWidth="1dp"
-        app:cardElevation="0dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="14dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Gestures"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="8dp">
-
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:src="@drawable/ic_play_pause"
-                    app:tint="#D0D0D0" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="1 Click (Vol Up + Down): Play / Pause"
-                    android:textColor="#D0D0D0"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="6dp">
-
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:src="@drawable/ic_skip_next"
-                    app:tint="#D0D0D0" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="2 Clicks: Next Track"
-                    android:textColor="#D0D0D0"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="6dp">
-
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:src="@drawable/ic_skip_previous"
-                    app:tint="#D0D0D0" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="3 Clicks: Previous Track"
-                    android:textColor="#D0D0D0"
-                    android:textSize="12sp" />
-            </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
@@ -225,9 +132,18 @@
             android:padding="14dp">
 
             <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switchHaptic"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Vibration Haptics on Action"
+                android:textColor="#E0E0E0"
+                android:textSize="13sp" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
                 android:id="@+id/switchGlyph"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
                 android:text="Glyph Light Flash on Action"
                 android:textColor="#E0E0E0"
                 android:textSize="13sp" />
@@ -236,37 +152,58 @@
                 android:id="@+id/switchTestMode"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="4dp"
                 android:text="Test Mode (bypass music check)"
                 android:textColor="#E0E0E0"
                 android:textSize="13sp" />
 
+            <!-- Whitelist Selector -->
             <LinearLayout
+                android:id="@+id/layoutWhitelistSelector"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginTop="8dp">
+                android:background="#1C1C1C"
+                android:padding="10dp"
+                android:layout_marginTop="10dp"
+                android:clickable="true"
+                android:focusable="true">
 
-                <TextView
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="App Target Whitelist"
-                    android:textColor="#A0A0A0"
-                    android:textSize="12sp" />
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Whitelisted Media Apps"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvWhitelistSummary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="All Media Apps (No Filter)"
+                        android:textColor="#A0A0A0"
+                        android:textSize="11.5sp"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
 
                 <TextView
-                    android:id="@+id/tvWhitelistApp"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="All Media Apps"
+                    android:text="SELECT"
                     android:textColor="#FFFFFF"
                     android:textSize="12sp"
                     android:textStyle="bold"
-                    android:background="#242424"
+                    android:background="#2E2E2E"
                     android:paddingHorizontal="10dp"
-                    android:paddingVertical="4dp" />
+                    android:paddingVertical="5dp" />
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

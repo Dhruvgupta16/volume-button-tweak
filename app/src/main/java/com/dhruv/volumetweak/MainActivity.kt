@@ -3,15 +3,19 @@ package com.dhruv.volumetweak
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.text.TextUtils
+import android.view.View
 import android.widget.ImageView
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -22,9 +26,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnEnableService: MaterialButton
     private lateinit var tvRamUsage: TextView
     private lateinit var tvCpuUsage: TextView
+    private lateinit var switchHaptic: MaterialSwitch
     private lateinit var switchGlyph: MaterialSwitch
     private lateinit var switchTestMode: MaterialSwitch
-    private lateinit var tvWhitelistApp: TextView
+    private lateinit var layoutWhitelistSelector: View
+    private lateinit var tvWhitelistSummary: TextView
     private lateinit var tvLogs: TextView
     private lateinit var scrollLogs: ScrollView
     private lateinit var btnClearLogs: ImageView
@@ -32,12 +38,7 @@ class MainActivity : AppCompatActivity() {
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
 
-    private val whitelistOptions = listOf(
-        "All Media Apps" to "ALL",
-        "YouTube Music" to "com.google.android.apps.youtube.music",
-        "Spotify" to "com.spotify.music"
-    )
-    private var whitelistIndex = 0
+    data class AppItem(val label: String, val packageName: String)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,49 +48,54 @@ class MainActivity : AppCompatActivity() {
         btnEnableService = findViewById(R.id.btnEnableService)
         tvRamUsage = findViewById(R.id.tvRamUsage)
         tvCpuUsage = findViewById(R.id.tvCpuUsage)
+        switchHaptic = findViewById(R.id.switchHaptic)
         switchGlyph = findViewById(R.id.switchGlyph)
         switchTestMode = findViewById(R.id.switchTestMode)
-        tvWhitelistApp = findViewById(R.id.tvWhitelistApp)
+        layoutWhitelistSelector = findViewById(R.id.layoutWhitelistSelector)
+        tvWhitelistSummary = findViewById(R.id.tvWhitelistSummary)
         tvLogs = findViewById(R.id.tvLogs)
         scrollLogs = findViewById(R.id.scrollLogs)
         btnClearLogs = findViewById(R.id.btnClearLogs)
 
         val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
 
-        // Test Mode
+        // Haptic Feedback Switch
+        val isHaptic = prefs.getBoolean("haptic_feedback", true)
+        switchHaptic.isChecked = isHaptic
+        VolumeTweakService.hapticReactionEnabled = isHaptic
+        switchHaptic.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("haptic_feedback", isChecked).apply()
+            VolumeTweakService.hapticReactionEnabled = isChecked
+            LogBuffer.log("Haptic feedback: ${if (isChecked) "ENABLED" else "DISABLED"}")
+        }
+
+        // Test Mode Switch
         val isTestMode = prefs.getBoolean("test_mode", false)
         switchTestMode.isChecked = isTestMode
         VolumeTweakService.testModeEnabled = isTestMode
-
         switchTestMode.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("test_mode", isChecked).apply()
             VolumeTweakService.testModeEnabled = isChecked
-            LogBuffer.log("Test mode: ${if (isChecked) "ON (Music bypass enabled)" else "OFF (Music active required)"}")
+            LogBuffer.log("Test mode: ${if (isChecked) "ON (Bypass active)" else "OFF (Music required)"}")
         }
 
         // Glyph Switch
         val isGlyph = prefs.getBoolean("glyph_reaction", false)
         switchGlyph.isChecked = isGlyph
         VolumeTweakService.glyphReactionEnabled = isGlyph
-
         switchGlyph.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("glyph_reaction", isChecked).apply()
             VolumeTweakService.glyphReactionEnabled = isChecked
             LogBuffer.log("Glyph reaction: ${if (isChecked) "ENABLED" else "DISABLED"}")
         }
 
-        // App Whitelist
-        val savedPkg = prefs.getString("whitelist_pkg", "ALL") ?: "ALL"
-        whitelistIndex = whitelistOptions.indexOfFirst { it.second == savedPkg }.coerceAtLeast(0)
-        updateWhitelistUI()
+        // Whitelist Multi-App Configuration
+        val savedWhitelist = prefs.getStringSet("whitelist_packages", emptySet()) ?: emptySet()
+        VolumeTweakService.targetAppPackages = savedWhitelist
+        updateWhitelistSummaryUI(savedWhitelist)
 
-        tvWhitelistApp.setOnClickListener {
-            whitelistIndex = (whitelistIndex + 1) % whitelistOptions.size
-            val selected = whitelistOptions[whitelistIndex]
-            prefs.edit().putString("whitelist_pkg", selected.second).apply()
-            VolumeTweakService.targetAppPackage = selected.second
-            updateWhitelistUI()
-            LogBuffer.log("Target filter: ${selected.first}")
+        layoutWhitelistSelector.setOnClickListener {
+            showAppPickerDialog()
         }
 
         btnEnableService.setOnClickListener {
@@ -102,9 +108,77 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateWhitelistUI() {
-        val selected = whitelistOptions[whitelistIndex]
-        tvWhitelistApp.text = selected.first
+    private fun updateWhitelistSummaryUI(packages: Set<String>) {
+        if (packages.isEmpty()) {
+            tvWhitelistSummary.text = "All Media Apps (No Filter)"
+        } else {
+            val pm = packageManager
+            val names = packages.map { pkg ->
+                try {
+                    val info = pm.getApplicationInfo(pkg, 0)
+                    pm.getApplicationLabel(info).toString()
+                } catch (e: Exception) {
+                    pkg
+                }
+            }
+            tvWhitelistSummary.text = if (names.size == 1) {
+                names.first()
+            } else {
+                "${names.take(2).joinToString(", ")} (+${names.size - 2} more)"
+            }
+        }
+    }
+
+    private fun showAppPickerDialog() {
+        val pm = packageManager
+        val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+        }
+        val resolveInfos = pm.queryIntentActivities(mainIntent, 0)
+
+        val appList = mutableListOf<AppItem>()
+        for (ri in resolveInfos) {
+            val pkg = ri.activityInfo.packageName
+            if (pkg == packageName) continue
+            val label = ri.loadLabel(pm).toString()
+            appList.add(AppItem(label, pkg))
+        }
+
+        // Sort alphabetically
+        appList.sortBy { it.label.lowercase() }
+
+        val appNames = appList.map { it.label }.toTypedArray()
+        val currentSelected = VolumeTweakService.targetAppPackages.toMutableSet()
+        val checkedItems = BooleanArray(appList.size) { i ->
+            currentSelected.contains(appList[i].packageName)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Select Target Media Apps")
+            .setMultiChoiceItems(appNames, checkedItems) { _, which, isChecked ->
+                val pkg = appList[which].packageName
+                if (isChecked) {
+                    currentSelected.add(pkg)
+                } else {
+                    currentSelected.remove(pkg)
+                }
+            }
+            .setPositiveButton("Save") { _, _ ->
+                val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+                prefs.edit().putStringSet("whitelist_packages", currentSelected).apply()
+                VolumeTweakService.targetAppPackages = currentSelected
+                updateWhitelistSummaryUI(currentSelected)
+                LogBuffer.log("Whitelist updated: ${currentSelected.size} apps selected")
+            }
+            .setNeutralButton("Clear (All Apps)") { _, _ ->
+                val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+                prefs.edit().putStringSet("whitelist_packages", emptySet()).apply()
+                VolumeTweakService.targetAppPackages = emptySet()
+                updateWhitelistSummaryUI(emptySet())
+                LogBuffer.log("Whitelist cleared: All media apps enabled")
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     override fun onResume() {
@@ -133,11 +207,11 @@ class MainActivity : AppCompatActivity() {
     private fun startPerformanceMonitoring() {
         monitorRunnable = object : Runnable {
             override fun run() {
-                val ramMb = PerformanceMonitor.getMemoryUsageMB(this@MainActivity)
+                val stats = PerformanceMonitor.getMemoryStats(this@MainActivity)
                 val cpuStr = PerformanceMonitor.getCpuUsagePercent()
-                tvRamUsage.text = String.format("RAM: %.1f MB", ramMb)
+                tvRamUsage.text = String.format("App: %.1f MB (PSS: %.1f MB)", stats.privateDirtyMb, stats.pssMb)
                 tvCpuUsage.text = "CPU: $cpuStr"
-                monitorHandler.postDelayed(this, 1800)
+                monitorHandler.postDelayed(this, 3500)
             }
         }
         monitorHandler.post(monitorRunnable!!)

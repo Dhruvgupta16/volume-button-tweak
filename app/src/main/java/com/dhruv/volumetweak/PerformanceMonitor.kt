@@ -3,62 +3,68 @@ package com.dhruv.volumetweak
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Process
-import java.io.RandomAccessFile
+import android.os.SystemClock
 
 object PerformanceMonitor {
 
-    fun getMemoryUsageMB(context: Context): Float {
+    private var lastCpuMs: Long = 0
+    private var lastTimeMs: Long = 0
+    private val cores = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+
+    init {
+        lastCpuMs = Process.getElapsedCpuTime()
+        lastTimeMs = SystemClock.uptimeMillis()
+    }
+
+    data class MemoryStats(
+        val privateDirtyMb: Float,
+        val pssMb: Float
+    )
+
+    fun getMemoryStats(context: Context): MemoryStats {
         return try {
-            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
             val pids = intArrayOf(Process.myPid())
-            val memoryInfoArray = activityManager.getProcessMemoryInfo(pids)
-            if (memoryInfoArray.isNotEmpty()) {
-                val totalPssKb = memoryInfoArray[0].totalPss
-                totalPssKb / 1024f
+            val memInfo = am.getProcessMemoryInfo(pids)
+            if (memInfo.isNotEmpty()) {
+                val privateDirty = memInfo[0].totalPrivateDirty / 1024f
+                val pss = memInfo[0].totalPss / 1024f
+                MemoryStats(privateDirty, pss)
             } else {
-                val runtime = Runtime.getRuntime()
-                (runtime.totalMemory() - runtime.freeMemory()) / (1024f * 1024f)
+                val rt = Runtime.getRuntime()
+                val heap = (rt.totalMemory() - rt.freeMemory()) / (1024f * 1024f)
+                MemoryStats(heap, heap)
             }
         } catch (e: Exception) {
-            0.0f
+            MemoryStats(0f, 0f)
         }
     }
 
-    private var lastCpuTime: Long = 0
-    private var lastSampleTime: Long = 0
-
     fun getCpuUsagePercent(): String {
-        return try {
-            val reader = RandomAccessFile("/proc/self/stat", "r")
-            val line = reader.readLine()
-            reader.close()
+        val currentCpuMs = Process.getElapsedCpuTime()
+        val currentTimeMs = SystemClock.uptimeMillis()
 
-            val tokens = line.split(" ")
-            val utime = tokens[13].toLong()
-            val stime = tokens[14].toLong()
-            val currentCpuTime = utime + stime
-            val currentTime = System.currentTimeMillis()
+        if (lastTimeMs == 0L) {
+            lastCpuMs = currentCpuMs
+            lastTimeMs = currentTimeMs
+            return "< 0.1%"
+        }
 
-            if (lastSampleTime == 0L || currentTime == lastSampleTime) {
-                lastCpuTime = currentCpuTime
-                lastSampleTime = currentTime
-                return "< 0.1%"
-            }
+        val timeDiff = currentTimeMs - lastTimeMs
+        val cpuDiff = currentCpuMs - lastCpuMs
 
-            val cpuDiff = currentCpuTime - lastCpuTime
-            val timeDiff = (currentTime - lastSampleTime) / 10 // approx clock ticks (100Hz)
+        lastCpuMs = currentCpuMs
+        lastTimeMs = currentTimeMs
 
-            lastCpuTime = currentCpuTime
-            lastSampleTime = currentTime
+        if (timeDiff <= 0 || cpuDiff <= 0) {
+            return "< 0.1%"
+        }
 
-            if (timeDiff > 0 && cpuDiff > 0) {
-                val percent = (cpuDiff.toFloat() / timeDiff.toFloat()) * 100f
-                String.format("%.1f%%", Math.min(percent, 100f))
-            } else {
-                "< 0.1%"
-            }
-        } catch (e: Exception) {
+        val usage = (cpuDiff.toFloat() / (timeDiff * cores).toFloat()) * 100f
+        return if (usage < 0.1f) {
             "< 0.1%"
+        } else {
+            String.format("%.1f%%", usage.coerceAtMost(100f))
         }
     }
 }

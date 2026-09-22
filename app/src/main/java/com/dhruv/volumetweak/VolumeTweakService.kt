@@ -39,7 +39,8 @@ class VolumeTweakService : AccessibilityService() {
     companion object {
         var testModeEnabled: Boolean = false
         var glyphReactionEnabled: Boolean = false
-        var targetAppPackage: String = "ALL" // "ALL", "com.google.android.apps.youtube.music", "com.spotify.music"
+        var hapticReactionEnabled: Boolean = true
+        var targetAppPackages: Set<String> = emptySet()
 
         private const val DUAL_PRESS_WINDOW_MS = 140L  // Window for simultaneous press
         private const val DEFER_SINGLE_PRESS_MS = 85L  // Deferral for initial key
@@ -54,6 +55,7 @@ class VolumeTweakService : AccessibilityService() {
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VolumeTweak:WakeLock")
         wakeLock?.setReferenceCounted(false)
         GlyphController.init(this)
+        HapticFeedbackController.init(this)
         LogBuffer.log("Service created and ready")
     }
 
@@ -108,7 +110,7 @@ class VolumeTweakService : AccessibilityService() {
 
         if (!isEnabledForAction) {
             if (action == KeyEvent.ACTION_DOWN) {
-                LogBuffer.log("$keyName $actionName [Bypass: Music Inactive / Whitelist]")
+                LogBuffer.log("$keyName $actionName [Bypass: Inactive / Whitelist]")
             }
             isVolUpPressed = false
             isVolDownPressed = false
@@ -165,16 +167,16 @@ class VolumeTweakService : AccessibilityService() {
     }
 
     private fun isAppWhitelisted(): Boolean {
-        if (targetAppPackage == "ALL" || testModeEnabled) {
+        if (targetAppPackages.isEmpty() || testModeEnabled) {
             return true
         }
         return try {
             val mediaSessionManager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
             val component = ComponentName(this, VolumeTweakService::class.java)
             val sessions = mediaSessionManager.getActiveSessions(component)
-            sessions.any { it.packageName.equals(targetAppPackage, ignoreCase = true) }
+            sessions.any { targetAppPackages.contains(it.packageName) }
         } catch (e: Exception) {
-            true // Fallback to allow if notification listener is ungranted
+            true // Fallback to allow if notification listener permission is not granted
         }
     }
 
@@ -225,6 +227,10 @@ class VolumeTweakService : AccessibilityService() {
     private fun dispatchGestureAction(clicks: Int) {
         if (glyphReactionEnabled) {
             GlyphController.pulse(Math.min(clicks, 3))
+        }
+
+        if (hapticReactionEnabled) {
+            HapticFeedbackController.vibrate(clicks)
         }
 
         when (clicks) {

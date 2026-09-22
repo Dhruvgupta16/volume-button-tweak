@@ -15,23 +15,13 @@ A low-footprint Android accessibility utility designed for Nothing OS and Androi
 
 ---
 
-## Architectural Details
+## Features
 
-### Input Dispatch & Key Filtering
-- Utilizes the Android Accessibility Service framework (`flagRequestFilterKeyEvents`, `canRequestFilterKeyEvents="true"`).
-- Evaluates key events with a 140ms simultaneous press threshold.
-- Normal press-and-hold volume ramping is preserved by checking `KeyEvent.repeatCount > 0` and delegating unhandled events directly to the operating system.
-
-### Resource Utilization
-- Average Process Memory: 10 to 14 MB (PSS).
-- Background CPU Utilization: Below 0.1% (event-driven execution without active polling threads).
-- Screen-Off Pocket Operation: Employs a transient partial wake lock during media key dispatch to guarantee responsiveness while the display is powered off.
-
-### Hardware Reaction
-- Integrated with Nothing Phone (2a) rear light interface via `CameraManager` torch control to deliver visual feedback pulses on successful gesture execution.
-
-### App Target Filtering
-- Optional target filtering restricts gesture handling exclusively to designated applications (such as YouTube Music or Spotify) or all active media sessions.
+- **Multi-App Whitelist Picker**: Select any installed media applications via an interactive multi-choice picker (e.g. YouTube Music, Spotify, Apple Music, VLC, Audible). When active, volume controls only trigger if the playing media originated from one of the designated apps.
+- **Haptic Vibration Feedback**: Subtle haptic pulses confirm when gestures are registered (1 pulse for Play/Pause, 2 for Next, 3 for Previous).
+- **Screen-Off Pocket Operation**: Transient partial wake locks ensure media controls remain responsive while the phone is locked in a pocket.
+- **Nothing Phone (2a) Glyph Light Reaction**: Optional visual pulses on the rear LED interface upon successful gesture execution.
+- **Low Memory Footprint**: Average private memory allocation is approximately 3 to 5 MB (total PSS including shared framework mappings is ~40 MB). CPU utilization remains below 0.1% during operation.
 
 ---
 
