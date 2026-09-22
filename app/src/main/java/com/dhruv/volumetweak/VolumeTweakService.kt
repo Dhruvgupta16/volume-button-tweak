@@ -72,7 +72,20 @@ class VolumeTweakService : AccessibilityService() {
                         super.onPlaybackConfigChanged(configs)
                         var foundActivePkg: String? = null
                         for (config in configs) {
-                            if (config.isActive && config.audioAttributes.usage == AudioAttributes.USAGE_MEDIA) {
+                            val isPlaying = try {
+                                val method = config.javaClass.getMethod("isActive")
+                                (method.invoke(config) as? Boolean) == true
+                            } catch (e: Exception) {
+                                true
+                            }
+
+                            val isMediaUsage = try {
+                                config.audioAttributes.usage == AudioAttributes.USAGE_MEDIA
+                            } catch (e: Exception) {
+                                true
+                            }
+
+                            if (isPlaying && isMediaUsage) {
                                 val uid = try {
                                     val method = config.javaClass.getMethod("getClientUid")
                                     method.invoke(config) as? Int
