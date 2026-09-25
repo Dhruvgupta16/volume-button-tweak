@@ -15,6 +15,8 @@ import android.provider.Settings
 import android.text.TextUtils
 import android.view.View
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -107,7 +109,7 @@ class MainActivity : AppCompatActivity() {
         // Dynamic Version Display
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
-            currentVersionName = pInfo.versionName ?: "1.8"
+            currentVersionName = pInfo.versionName ?: "1.9"
             val vCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 pInfo.longVersionCode
             } else {
@@ -115,7 +117,7 @@ class MainActivity : AppCompatActivity() {
             }
             tvAppVersion.text = "v$currentVersionName (Build $vCode)"
         } catch (e: Exception) {
-            tvAppVersion.text = "v1.8 (Build 9)"
+            tvAppVersion.text = "v1.9 (Build 10)"
         }
 
         // Check for Updates
@@ -329,14 +331,73 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showUpdateAvailableDialog(result: UpdateChecker.CheckResult) {
+        val apkUrl = result.downloadUrl
+        if (apkUrl.isNullOrBlank()) {
+            Toast.makeText(this, "No download URL available for this update.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         AlertDialog.Builder(this)
-            .setTitle("New Update: ${result.latestVersion}")
-            .setMessage("A new version is available on GitHub!\n\nRelease info:\n${result.releaseNotes ?: "Bug fixes and performance improvements."}")
-            .setPositiveButton("Download & Install") { _, _ ->
-                UpdateChecker.openDownloadUrl(this, result.downloadUrl)
+            .setTitle("Update Available: ${result.latestVersion}")
+            .setMessage("A new version is ready to install!\n\nRelease info:\n${result.releaseNotes ?: "Performance improvements and bug fixes."}")
+            .setPositiveButton("Update Now") { _, _ ->
+                startInAppUpdate(apkUrl)
             }
             .setNegativeButton("Later", null)
             .show()
+    }
+
+    private fun startInAppUpdate(downloadUrl: String) {
+        val dp = resources.displayMetrics.density
+        val padding = (20 * dp).toInt()
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, padding, padding, padding)
+        }
+
+        val tvProgress = TextView(this).apply {
+            text = "Downloading update... 0%"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 14f
+            setPadding(0, 0, 0, (12 * dp).toInt())
+        }
+
+        val progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = false
+            max = 100
+            progress = 0
+        }
+
+        layout.addView(tvProgress)
+        layout.addView(progressBar)
+
+        val progressDialog = AlertDialog.Builder(this)
+            .setTitle("Installing Update")
+            .setView(layout)
+            .setCancelable(false)
+            .create()
+
+        progressDialog.show()
+
+        UpdateChecker.downloadAndInstallApk(
+            activity = this,
+            downloadUrl = downloadUrl,
+            onProgress = { percent ->
+                progressBar.progress = percent
+                tvProgress.text = "Downloading update... $percent%"
+            },
+            onComplete = {
+                progressDialog.dismiss()
+            },
+            onError = { errMsg ->
+                progressDialog.dismiss()
+                AlertDialog.Builder(this)
+                    .setTitle("Update Notice")
+                    .setMessage(errMsg)
+                    .setPositiveButton("OK", null)
+                    .show()
+            }
+        )
     }
 
     private fun updateWhitelistSummaryUI(packages: Set<String>) {

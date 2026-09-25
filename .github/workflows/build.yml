@@ -41,13 +41,19 @@ jobs:
           name: Volume-Button-Tweak-Debug-APK
           path: app/build/outputs/apk/debug/app-debug.apk
 
+      - name: Extract Version
+        id: get_version
+        run: |
+          VERSION=$(grep 'versionName = ' app/build.gradle.kts | awk -F'"' '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Publish GitHub Release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.8
-          name: "Volume Button Tweak v1.8"
-          body: "Automated release build with Nothing OS launcher adaptive icons, master kill switch, volume hold ramping fix, and gesture customization suite."
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: "Volume Button Tweak v${{ steps.get_version.outputs.version }}"
+          body: "Automated release build with in-app 1-tap direct installer, Nothing OS launcher adaptive icons, master kill switch, volume hold ramping fix, and gesture customization suite."
           files: app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

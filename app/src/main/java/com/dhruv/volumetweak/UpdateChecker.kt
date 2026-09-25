@@ -1,12 +1,18 @@
 package com.dhruv.volumetweak
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
+import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.BufferedReader
+import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
@@ -33,8 +39,8 @@ object UpdateChecker {
             try {
                 val url = URL(GITHUB_REPO_API)
                 val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 6000
-                connection.readTimeout = 6000
+                connection.connectTimeout = 7000
+                connection.readTimeout = 7000
                 connection.setRequestProperty("User-Agent", "VolumeButtonTweak-App")
                 connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
 
@@ -73,7 +79,6 @@ object UpdateChecker {
                     )
                     mainHandler.post { onResult(result) }
                 } else if (responseCode == 404) {
-                    // No releases published yet on repo
                     val result = CheckResult(
                         hasUpdate = false,
                         latestVersion = "v$currentVersionName",
@@ -118,6 +123,124 @@ object UpdateChecker {
             if (rem < cur) return false
         }
         return false
+    }
+
+    /**
+     * Downloads APK in-app, follows CDN 302 redirects, streams bytes with progress tracking,
+     * and triggers Android's system package installer screen directly.
+     */
+    fun downloadAndInstallApk(
+        activity: Activity,
+        downloadUrl: String,
+        onProgress: (Int) -> Unit,
+        onComplete: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        // Android 8.0+ Unknown App Sources Permission Check
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!activity.packageManager.canRequestPackageInstalls()) {
+                try {
+                    val permissionIntent = Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${activity.packageName}")
+                    )
+                    activity.startActivity(permissionIntent)
+                    onError("Enable 'Allow from this source' for Volume Tweak in Settings, then tap Install Update again.")
+                } catch (e: Exception) {
+                    onError("Permission required to install unknown apps: ${e.message}")
+                }
+                return
+            }
+        }
+
+        executor.execute {
+            try {
+                var currentUrl = downloadUrl
+                var connection: HttpURLConnection
+                var redirects = 0
+
+                // Follow redirects (GitHub Releases 302 redirect to AWS S3)
+                while (true) {
+                    val u = URL(currentUrl)
+                    connection = u.openConnection() as HttpURLConnection
+                    connection.connectTimeout = 12000
+                    connection.readTimeout = 20000
+                    connection.setRequestProperty("User-Agent", "VolumeButtonTweak-App")
+                    connection.instanceFollowRedirects = true
+
+                    val status = connection.responseCode
+                    if (status == HttpURLConnection.HTTP_MOVED_TEMP ||
+                        status == HttpURLConnection.HTTP_MOVED_PERM ||
+                        status == 307 || status == 308
+                    ) {
+                        currentUrl = connection.getHeaderField("Location")
+                        connection.disconnect()
+                        redirects++
+                        if (redirects > 6) throw Exception("Too many redirects")
+                        continue
+                    }
+                    if (status != HttpURLConnection.HTTP_OK) {
+                        throw Exception("Download server returned HTTP $status")
+                    }
+                    break
+                }
+
+                val totalLength = connection.contentLength
+                val apkDir = File(activity.cacheDir, "updates")
+                if (!apkDir.exists()) apkDir.mkdirs()
+                val apkFile = File(apkDir, "update.apk")
+                if (apkFile.exists()) apkFile.delete()
+
+                val input = connection.inputStream
+                val output = FileOutputStream(apkFile)
+
+                val buffer = ByteArray(8192)
+                var bytesRead: Int
+                var totalBytesRead: Long = 0
+                var lastReportedPercent = -1
+
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    output.write(buffer, 0, bytesRead)
+                    totalBytesRead += bytesRead
+                    if (totalLength > 0) {
+                        val percent = ((totalBytesRead * 100) / totalLength).toInt()
+                        if (percent != lastReportedPercent) {
+                            lastReportedPercent = percent
+                            mainHandler.post { onProgress(percent) }
+                        }
+                    }
+                }
+
+                output.flush()
+                output.close()
+                input.close()
+                connection.disconnect()
+
+                mainHandler.post {
+                    onComplete()
+                    try {
+                        val contentUri = FileProvider.getUriForFile(
+                            activity,
+                            "${activity.packageName}.fileprovider",
+                            apkFile
+                        )
+                        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(contentUri, "application/vnd.android.package-archive")
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        activity.startActivity(installIntent)
+                    } catch (e: Exception) {
+                        onError("Failed to launch package installer: ${e.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                mainHandler.post {
+                    onComplete()
+                    onError(e.message ?: "Failed to download update APK")
+                }
+            }
+        }
     }
 
     fun openDownloadUrl(context: Context, urlString: String?) {
