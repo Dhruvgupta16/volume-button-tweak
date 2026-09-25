@@ -71,7 +71,7 @@ class MainActivity : AppCompatActivity() {
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
-    private var currentVersionName: String = "1.9.4"
+    private var currentVersionName = "1.9.5"
 
     private val customCombosList = mutableListOf<CustomCombo>()
 

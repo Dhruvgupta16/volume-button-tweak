@@ -80,9 +80,10 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         var dualPressWindowMs: Long = 140L
         var pauseSessionTimeoutMs: Long = 30000L
 
+        private const val DEFER_SINGLE_PRESS_MS = 65L
         private const val HOLD_THRESHOLD_MS = 450L
         private const val SEQUENCE_STEP_TIMEOUT_MS = 500L
-        private const val CONTINUOUS_RAMP_INTERVAL_MS = 110L
+        private const val CONTINUOUS_RAMP_INTERVAL_MS = 55L
         private const val POST_ACTION_COOLDOWN_MS = 350L
 
         fun reloadPreferences(context: Context) {
@@ -216,10 +217,23 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         LogBuffer.log("Service interrupted")
     }
 
+    private fun isCallOrRingingActive(): Boolean {
+        val mode = audioManager.mode
+        return mode == AudioManager.MODE_IN_CALL ||
+               mode == AudioManager.MODE_IN_COMMUNICATION ||
+               mode == AudioManager.MODE_RINGTONE ||
+               mode == AudioManager.MODE_CALL_SCREENING
+    }
+
     override fun onKeyEvent(event: KeyEvent): Boolean {
         // Master Kill Switch: If suspended, pass all keys through with 0 overhead
         if (isServiceSuspended) {
             return false
+        }
+
+        // Active Phone Call / VoIP / Ringing: Completely pass through so call volume works 100% natively
+        if (isCallOrRingingActive()) {
+            return super.onKeyEvent(event)
         }
 
         val keyCode = event.keyCode
@@ -366,9 +380,13 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 return true
             }
 
-            // 3. Normal Volume Key Release
+            // 3. Normal Volume Key Release: Stop continuous ramp & fire quick tap immediately
             cancelContinuousVolumeRamp()
-            cancelPendingSinglePress()
+            if (pendingSinglePressRunnable != null) {
+                cancelPendingSinglePress()
+                adjustVolume(keyCode)
+                return true
+            }
             return false
         }
 
@@ -393,7 +411,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             }
         }
         pendingSinglePressRunnable = runnable
-        handler.postDelayed(runnable, dualPressWindowMs + 10L)
+        handler.postDelayed(runnable, DEFER_SINGLE_PRESS_MS)
     }
 
     private fun startContinuousVolumeRamp(keyCode: Int) {
@@ -403,7 +421,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             override fun run() {
                 val isStillPressed = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolUpPressed else isVolDownPressed
                 if (isStillPressed && !isDualPressActive && !isSequenceActive) {
-                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
+                    audioManager.adjustSuggestedStreamVolume(direction, AudioManager.USE_DEFAULT_STREAM_TYPE, AudioManager.FLAG_SHOW_UI)
                     handler.postDelayed(this, CONTINUOUS_RAMP_INTERVAL_MS)
                 } else {
                     cancelContinuousVolumeRamp()
@@ -433,9 +451,9 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         } else {
             AudioManager.ADJUST_LOWER
         }
-        audioManager.adjustStreamVolume(
-            AudioManager.STREAM_MUSIC,
+        audioManager.adjustSuggestedStreamVolume(
             direction,
+            AudioManager.USE_DEFAULT_STREAM_TYPE,
             AudioManager.FLAG_SHOW_UI
         )
     }
