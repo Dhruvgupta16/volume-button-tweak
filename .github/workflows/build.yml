@@ -3,6 +3,7 @@ name: Build Android APK
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
@@ -47,13 +48,13 @@ jobs:
           VERSION=$(grep 'versionName = ' app/build.gradle.kts | awk -F'"' '{print $2}')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Publish GitHub Release
-        if: github.ref == 'refs/heads/main'
+      - name: Publish GitHub Release (Only on Approved Release Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.get_version.outputs.version }}
-          name: "Volume Button Tweak v${{ steps.get_version.outputs.version }}"
-          body: "Automated release build with in-app 1-tap direct installer, Nothing OS launcher adaptive icons, master kill switch, volume hold ramping fix, and gesture customization suite."
+          tag_name: ${{ github.ref_name }}
+          name: "Volume Button Tweak ${{ github.ref_name }}"
+          body: "Official release build for Volume Button Tweak."
           files: app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
