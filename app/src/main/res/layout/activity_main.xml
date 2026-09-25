@@ -771,136 +771,29 @@
                         android:layout_height="1dp"
                         android:background="#181818" />
 
-                    <!-- Combo 1: Dual Press + Vol Up -->
+                    <!-- Dynamic Combos Container -->
                     <LinearLayout
-                        android:id="@+id/rowComboUp"
+                        android:id="@+id/containerCustomCombos"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingVertical="10dp"
-                        android:clickable="true"
-                        android:focusable="true">
+                        android:orientation="vertical" />
 
-                        <FrameLayout
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:background="@drawable/bg_icon_circle">
-
-                            <ImageView
-                                android:layout_width="18dp"
-                                android:layout_height="18dp"
-                                android:layout_gravity="center"
-                                app:srcCompat="@drawable/ic_combo"
-                                app:tint="#FFFFFF" />
-                        </FrameLayout>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:layout_marginStart="12dp">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Dual Press → Vol UP"
-                                android:textColor="#E0E0E0"
-                                android:textSize="13sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Both buttons, then immediately Up"
-                                android:textColor="#666666"
-                                android:textSize="11sp" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/tvComboUpAction"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Fast Forward 15s"
-                            android:textColor="#D71921"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:layout_marginStart="6dp"
-                            app:srcCompat="@drawable/ic_chevron_right" />
-                    </LinearLayout>
-
-                    <View
+                    <!-- Add Custom Sequence Button -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnAddCustomCombo"
+                        style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="#181818" />
-
-                    <!-- Combo 2: Dual Press + Vol Down -->
-                    <LinearLayout
-                        android:id="@+id/rowComboDown"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingVertical="10dp"
-                        android:clickable="true"
-                        android:focusable="true">
-
-                        <FrameLayout
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:background="@drawable/bg_icon_circle">
-
-                            <ImageView
-                                android:layout_width="18dp"
-                                android:layout_height="18dp"
-                                android:layout_gravity="center"
-                                app:srcCompat="@drawable/ic_combo"
-                                app:tint="#FFFFFF" />
-                        </FrameLayout>
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical"
-                            android:layout_marginStart="12dp">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Dual Press → Vol DOWN"
-                                android:textColor="#E0E0E0"
-                                android:textSize="13sp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Both buttons, then immediately Down"
-                                android:textColor="#666666"
-                                android:textSize="11sp" />
-                        </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/tvComboDownAction"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Rewind 15s"
-                            android:textColor="#D71921"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:layout_marginStart="6dp"
-                            app:srcCompat="@drawable/ic_chevron_right" />
-                    </LinearLayout>
+                        android:layout_height="48dp"
+                        android:layout_marginTop="8dp"
+                        android:text="+ ADD CUSTOM SEQUENCE"
+                        android:textColor="#FFFFFF"
+                        android:textSize="12.5sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.05"
+                        app:backgroundTint="#1A1A1A"
+                        app:cornerRadius="12dp"
+                        app:strokeColor="#262626"
+                        app:strokeWidth="1dp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

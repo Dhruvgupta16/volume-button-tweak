@@ -11,8 +11,8 @@ android {
         applicationId = "com.dhruv.volumetweak"
         minSdk = 26
         targetSdk = 34
-        versionCode = 12
-        versionName = "1.9.2"
+        versionCode = 13
+        versionName = "1.9.3"
     }
 
     signingConfigs {

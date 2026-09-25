@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.text.TextUtils
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -53,10 +54,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var switchCombo: MaterialSwitch
     private lateinit var layoutComboOptions: View
-    private lateinit var rowComboUp: View
-    private lateinit var tvComboUpAction: TextView
-    private lateinit var rowComboDown: View
-    private lateinit var tvComboDownAction: TextView
+    private lateinit var containerCustomCombos: LinearLayout
+    private lateinit var btnAddCustomCombo: MaterialButton
 
     private lateinit var switchHaptic: MaterialSwitch
     private lateinit var switchProximity: MaterialSwitch
@@ -72,20 +71,9 @@ class MainActivity : AppCompatActivity() {
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
-    private var currentVersionName: String = "1.9.2"
+    private var currentVersionName: String = "1.9.3"
 
-    private val allActionOptions = listOf(
-        "PLAY_PAUSE",
-        "NEXT",
-        "PREV",
-        "FAST_FORWARD",
-        "REWIND",
-        "MUTE",
-        "VOL_MAX",
-        "VOL_MIN",
-        "FLASHLIGHT_TOGGLE",
-        "VOICE_ASSISTANT"
-    )
+    private val customCombosList = mutableListOf<CustomCombo>()
 
     data class AppItem(val label: String, val packageName: String)
 
@@ -120,10 +108,8 @@ class MainActivity : AppCompatActivity() {
 
         switchCombo = findViewById(R.id.switchCombo)
         layoutComboOptions = findViewById(R.id.layoutComboOptions)
-        rowComboUp = findViewById(R.id.rowComboUp)
-        tvComboUpAction = findViewById(R.id.tvComboUpAction)
-        rowComboDown = findViewById(R.id.rowComboDown)
-        tvComboDownAction = findViewById(R.id.tvComboDownAction)
+        containerCustomCombos = findViewById(R.id.containerCustomCombos)
+        btnAddCustomCombo = findViewById(R.id.btnAddCustomCombo)
 
         switchHaptic = findViewById(R.id.switchHaptic)
         switchProximity = findViewById(R.id.switchProximity)
@@ -173,78 +159,75 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Master Kill Switch
-        val isSuspended = prefs.getBoolean("master_service_suspended", false)
+        val isSuspended = prefs.getBoolean("service_suspended", false)
         switchMasterKill.isChecked = !isSuspended
         VolumeTweakService.isServiceSuspended = isSuspended
         updateMasterStatusUI(!isSuspended)
 
-        switchMasterKill.setOnCheckedChangeListener { _, isActive ->
-            val suspended = !isActive
-            prefs.edit().putBoolean("master_service_suspended", suspended).apply()
+        switchMasterKill.setOnCheckedChangeListener { _, isChecked ->
+            val suspended = !isChecked
+            prefs.edit().putBoolean("service_suspended", suspended).apply()
             VolumeTweakService.isServiceSuspended = suspended
-            updateMasterStatusUI(isActive)
-            LogBuffer.log("[MASTER] Service ${if (isActive) "ACTIVATED" else "SUSPENDED (Pass-through mode)"}")
+            updateMasterStatusUI(isChecked)
+            LogBuffer.log("Master switch: ${if (isChecked) "ACTIVE" else "SUSPENDED"}")
         }
 
-        // Gesture Action 1 Customizer
+        // Standard Dual-Press Gestures
         val action1 = prefs.getString("action_1_click", "PLAY_PAUSE") ?: "PLAY_PAUSE"
         VolumeTweakService.action1Click = action1
-        tvAction1.text = formatActionLabel(action1)
+        tvAction1.text = ActionRegistry.getTitle(action1)
         rowGesture1.setOnClickListener {
-            showActionPicker("1 Click Action", allActionOptions, action1) { selected ->
+            showActionPicker("1 Click Action", action1) { selected ->
                 prefs.edit().putString("action_1_click", selected).apply()
                 VolumeTweakService.action1Click = selected
-                tvAction1.text = formatActionLabel(selected)
+                tvAction1.text = ActionRegistry.getTitle(selected)
                 LogBuffer.log("Config: 1 Click -> $selected")
             }
         }
 
-        // Gesture Action 2 Customizer
         val action2 = prefs.getString("action_2_clicks", "NEXT") ?: "NEXT"
         VolumeTweakService.action2Clicks = action2
-        tvAction2.text = formatActionLabel(action2)
+        tvAction2.text = ActionRegistry.getTitle(action2)
         rowGesture2.setOnClickListener {
-            showActionPicker("2 Clicks Action", allActionOptions, action2) { selected ->
+            showActionPicker("2 Clicks Action", action2) { selected ->
                 prefs.edit().putString("action_2_clicks", selected).apply()
                 VolumeTweakService.action2Clicks = selected
-                tvAction2.text = formatActionLabel(selected)
+                tvAction2.text = ActionRegistry.getTitle(selected)
                 LogBuffer.log("Config: 2 Clicks -> $selected")
             }
         }
 
-        // Gesture Action 3 Customizer
         val action3 = prefs.getString("action_3_clicks", "PREV") ?: "PREV"
         VolumeTweakService.action3Clicks = action3
-        tvAction3.text = formatActionLabel(action3)
+        tvAction3.text = ActionRegistry.getTitle(action3)
         rowGesture3.setOnClickListener {
-            showActionPicker("3 Clicks Action", allActionOptions, action3) { selected ->
+            showActionPicker("3 Clicks Action", action3) { selected ->
                 prefs.edit().putString("action_3_clicks", selected).apply()
                 VolumeTweakService.action3Clicks = selected
-                tvAction3.text = formatActionLabel(selected)
+                tvAction3.text = ActionRegistry.getTitle(selected)
                 LogBuffer.log("Config: 3 Clicks -> $selected")
             }
         }
 
-        // Gesture Action 4 Customizer
-        val action4 = prefs.getString("action_4_clicks", "FAST_FORWARD") ?: "FAST_FORWARD"
+        val action4 = prefs.getString("action_4_clicks", "SKIP_FWD_15") ?: "SKIP_FWD_15"
         VolumeTweakService.action4Clicks = action4
-        tvAction4.text = formatActionLabel(action4)
+        tvAction4.text = ActionRegistry.getTitle(action4)
         rowGesture4.setOnClickListener {
-            showActionPicker("4 Clicks Action", allActionOptions, action4) { selected ->
+            showActionPicker("4 Clicks Action", action4) { selected ->
                 prefs.edit().putString("action_4_clicks", selected).apply()
                 VolumeTweakService.action4Clicks = selected
-                tvAction4.text = formatActionLabel(selected)
+                tvAction4.text = ActionRegistry.getTitle(selected)
                 LogBuffer.log("Config: 4 Clicks -> $selected")
             }
         }
 
         // Sensitivity (Dual-Press Window) Customizer
-        val windowMs = prefs.getLong("dual_press_window_ms", 140L)
+        val windowMs = prefs.getLong("dual_press_window", 140L)
         VolumeTweakService.dualPressWindowMs = windowMs
         tvSensitivity.text = formatSensitivityLabel(windowMs)
         rowSensitivity.setOnClickListener {
             showSensitivityPicker(windowMs) { selectedMs ->
-                prefs.edit().putLong("dual_press_window_ms", selectedMs).apply()
+                prefs.edit().putLong("dual_press_window", selectedMs).apply()
                 VolumeTweakService.dualPressWindowMs = selectedMs
                 tvSensitivity.text = formatSensitivityLabel(selectedMs)
                 LogBuffer.log("Config: Window -> ${selectedMs}ms")
@@ -252,7 +235,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Combo Sequences Setup
-        val isCombo = prefs.getBoolean("combo_sequences_enabled", false)
+        val isCombo = prefs.getBoolean("combo_sequences_enabled", true)
         switchCombo.isChecked = isCombo
         VolumeTweakService.comboSequencesEnabled = isCombo
         layoutComboOptions.visibility = if (isCombo) View.VISIBLE else View.GONE
@@ -264,28 +247,15 @@ class MainActivity : AppCompatActivity() {
             LogBuffer.log("Combo Sequences: ${if (isChecked) "ENABLED" else "DISABLED"}")
         }
 
-        val comboUp = prefs.getString("combo_dual_up", "FAST_FORWARD") ?: "FAST_FORWARD"
-        VolumeTweakService.comboDualThenUp = comboUp
-        tvComboUpAction.text = formatActionLabel(comboUp)
-        rowComboUp.setOnClickListener {
-            showActionPicker("Dual Press + Vol UP Action", allActionOptions, comboUp) { selected ->
-                prefs.edit().putString("combo_dual_up", selected).apply()
-                VolumeTweakService.comboDualThenUp = selected
-                tvComboUpAction.text = formatActionLabel(selected)
-                LogBuffer.log("Config: Combo UP -> $selected")
-            }
-        }
+        // Load & Render Dynamic Custom Combos
+        val savedCombosJson = prefs.getString("custom_combos_json", null)
+        customCombosList.clear()
+        customCombosList.addAll(CustomCombo.parseList(savedCombosJson))
+        VolumeTweakService.customCombos = customCombosList
+        renderCustomCombos()
 
-        val comboDown = prefs.getString("combo_dual_down", "REWIND") ?: "REWIND"
-        VolumeTweakService.comboDualThenDown = comboDown
-        tvComboDownAction.text = formatActionLabel(comboDown)
-        rowComboDown.setOnClickListener {
-            showActionPicker("Dual Press + Vol DOWN Action", allActionOptions, comboDown) { selected ->
-                prefs.edit().putString("combo_dual_down", selected).apply()
-                VolumeTweakService.comboDualThenDown = selected
-                tvComboDownAction.text = formatActionLabel(selected)
-                LogBuffer.log("Config: Combo DOWN -> $selected")
-            }
+        btnAddCustomCombo.setOnClickListener {
+            showSequenceBuilderDialog()
         }
 
         // Haptic Feedback Switch
@@ -302,11 +272,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Proximity Sensor Guard Switch
-        val isProximity = prefs.getBoolean("proximity_sensor_guard", false)
+        val isProximity = prefs.getBoolean("proximity_pocket_guard", false)
         switchProximity.isChecked = isProximity
         VolumeTweakService.proximitySensorEnabled = isProximity
         switchProximity.setOnCheckedChangeListener { _, isChecked ->
-            prefs.edit().putBoolean("proximity_sensor_guard", isChecked).apply()
+            prefs.edit().putBoolean("proximity_pocket_guard", isChecked).apply()
             VolumeTweakService.proximitySensorEnabled = isChecked
             LogBuffer.log("Proximity Guard: ${if (isChecked) "ENABLED" else "DISABLED"}")
         }
@@ -332,7 +302,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Whitelist Multi-App Configuration
-        val savedWhitelist = prefs.getStringSet("whitelist_packages", emptySet()) ?: emptySet()
+        val savedWhitelist = prefs.getStringSet("target_apps", emptySet()) ?: emptySet()
         VolumeTweakService.targetAppPackages = savedWhitelist
         updateWhitelistSummaryUI(savedWhitelist)
 
@@ -362,32 +332,169 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun updateMasterStatusUI(isActive: Boolean) {
-        if (isActive) {
-            tvMasterStatusTitle.text = "Service Status: ACTIVE"
-            tvMasterStatusTitle.setTextColor(Color.WHITE)
-            tvMasterStatusSubtitle.text = "Intercepting volume button gestures"
-        } else {
-            tvMasterStatusTitle.text = "Service Status: SUSPENDED"
-            tvMasterStatusTitle.setTextColor(Color.parseColor("#E50914"))
-            tvMasterStatusSubtitle.text = "Volume buttons 100% normal (tweak sleeping)"
+    private fun renderCustomCombos() {
+        containerCustomCombos.removeAllViews()
+        val inflater = LayoutInflater.from(this)
+
+        if (customCombosList.isEmpty()) {
+            val emptyTv = TextView(this).apply {
+                text = "No combos added yet. Tap '+ ADD CUSTOM SEQUENCE' below."
+                setTextColor(Color.parseColor("#666666"))
+                textSize = 12f
+                setPadding(0, 16, 0, 16)
+            }
+            containerCustomCombos.addView(emptyTv)
+            return
+        }
+
+        for (combo in customCombosList) {
+            val itemView = inflater.inflate(R.layout.item_custom_combo, containerCustomCombos, false)
+
+            val tvSequence = itemView.findViewById<TextView>(R.id.tvComboSequence)
+            val tvAction = itemView.findViewById<TextView>(R.id.tvComboAction)
+            val switchItem = itemView.findViewById<MaterialSwitch>(R.id.switchComboItem)
+            val btnDelete = itemView.findViewById<ImageView>(R.id.btnDeleteCombo)
+            val layoutRow = itemView.findViewById<View>(R.id.layoutComboRow)
+
+            tvSequence.text = combo.getDisplaySequence()
+            tvAction.text = ActionRegistry.getTitle(combo.action)
+            switchItem.isChecked = combo.isEnabled
+
+            switchItem.setOnCheckedChangeListener { _, isChecked ->
+                combo.isEnabled = isChecked
+                saveCustomCombosToPrefs()
+            }
+
+            layoutRow.setOnClickListener {
+                showActionPicker("Select Action for ${combo.getDisplaySequence()}", combo.action) { newAction ->
+                    combo.action = newAction
+                    tvAction.text = ActionRegistry.getTitle(newAction)
+                    saveCustomCombosToPrefs()
+                }
+            }
+
+            btnDelete.setOnClickListener {
+                AlertDialog.Builder(this)
+                    .setTitle("Delete Sequence")
+                    .setMessage("Remove sequence '${combo.getDisplaySequence()}'?")
+                    .setPositiveButton("Delete") { _, _ ->
+                        customCombosList.remove(combo)
+                        saveCustomCombosToPrefs()
+                        renderCustomCombos()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+
+            containerCustomCombos.addView(itemView)
         }
     }
 
-    private fun formatActionLabel(action: String): String {
-        return when (action) {
-            "PLAY_PAUSE" -> "Play / Pause"
-            "NEXT" -> "Next Track"
-            "PREV" -> "Previous Track"
-            "FAST_FORWARD" -> "Fast Forward 15s"
-            "REWIND" -> "Rewind 15s"
-            "MUTE" -> "Toggle Mute"
-            "VOL_MAX" -> "Max Volume (100%)"
-            "VOL_MIN" -> "Quiet Mode (10%)"
-            "FLASHLIGHT_TOGGLE" -> "Flashlight (ON/OFF)"
-            "FLASHLIGHT" -> "Flashlight Pulse"
-            "VOICE_ASSISTANT" -> "Voice Assistant"
-            else -> action
+    private fun saveCustomCombosToPrefs() {
+        val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+        val jsonStr = CustomCombo.toJsonList(customCombosList)
+        prefs.edit().putString("custom_combos_json", jsonStr).apply()
+        VolumeTweakService.customCombos = customCombosList.toList()
+        LogBuffer.log("[COMBO CONFIG] Saved ${customCombosList.size} sequences")
+    }
+
+    private fun showSequenceBuilderDialog() {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_sequence_builder, null)
+        val builderTokens = mutableListOf("DUAL")
+        var chosenAction = "SKIP_FWD_15"
+
+        val tvDisplay = dialogView.findViewById<TextView>(R.id.tvBuilderSequenceDisplay)
+        val tvActionTitle = dialogView.findViewById<TextView>(R.id.tvBuilderActionTitle)
+        val rowSelectAction = dialogView.findViewById<View>(R.id.rowBuilderSelectAction)
+
+        val btnDual = dialogView.findViewById<MaterialButton>(R.id.btnTokenDual)
+        val btnDualHold = dialogView.findViewById<MaterialButton>(R.id.btnTokenDualHold)
+        val btnUp = dialogView.findViewById<MaterialButton>(R.id.btnTokenUp)
+        val btnUpHold = dialogView.findViewById<MaterialButton>(R.id.btnTokenUpHold)
+        val btnDown = dialogView.findViewById<MaterialButton>(R.id.btnTokenDown)
+        val btnDownHold = dialogView.findViewById<MaterialButton>(R.id.btnTokenDownHold)
+        val btnBackspace = dialogView.findViewById<MaterialButton>(R.id.btnTokenBackspace)
+        val btnClear = dialogView.findViewById<MaterialButton>(R.id.btnTokenClear)
+
+        val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnBuilderCancel)
+        val btnSave = dialogView.findViewById<MaterialButton>(R.id.btnBuilderSave)
+
+        fun updateUI() {
+            if (builderTokens.isEmpty()) {
+                tvDisplay.text = "No inputs added yet"
+                tvDisplay.setTextColor(Color.parseColor("#7A7A7A"))
+            } else {
+                tvDisplay.text = builderTokens.joinToString(" → ") { CustomCombo.formatToken(it) }
+                tvDisplay.setTextColor(Color.WHITE)
+            }
+            tvActionTitle.text = ActionRegistry.getTitle(chosenAction)
+        }
+
+        updateUI()
+
+        btnDual.setOnClickListener { builderTokens.add("DUAL"); updateUI() }
+        btnDualHold.setOnClickListener { builderTokens.add("DUAL_HOLD"); updateUI() }
+        btnUp.setOnClickListener { builderTokens.add("UP"); updateUI() }
+        btnUpHold.setOnClickListener { builderTokens.add("UP_HOLD"); updateUI() }
+        btnDown.setOnClickListener { builderTokens.add("DOWN"); updateUI() }
+        btnDownHold.setOnClickListener { builderTokens.add("DOWN_HOLD"); updateUI() }
+
+        btnBackspace.setOnClickListener {
+            if (builderTokens.isNotEmpty()) {
+                builderTokens.removeAt(builderTokens.size - 1)
+                updateUI()
+            }
+        }
+
+        btnClear.setOnClickListener {
+            builderTokens.clear()
+            updateUI()
+        }
+
+        rowSelectAction.setOnClickListener {
+            showActionPicker("Select Sequence Action", chosenAction) { selected ->
+                chosenAction = selected
+                updateUI()
+            }
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        btnCancel.setOnClickListener { dialog.dismiss() }
+
+        btnSave.setOnClickListener {
+            if (builderTokens.isEmpty()) {
+                Toast.makeText(this, "Please add at least one button step.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            val newCombo = CustomCombo(
+                id = "combo_${System.currentTimeMillis()}",
+                tokens = builderTokens.toList(),
+                action = chosenAction,
+                isEnabled = true
+            )
+            customCombosList.add(newCombo)
+            saveCustomCombosToPrefs()
+            renderCustomCombos()
+            dialog.dismiss()
+            Toast.makeText(this, "Custom sequence added!", Toast.LENGTH_SHORT).show()
+        }
+
+        dialog.show()
+    }
+
+    private fun updateMasterStatusUI(isActive: Boolean) {
+        if (isActive) {
+            tvMasterStatusTitle.text = "TWEAK ACTIVE"
+            tvMasterStatusTitle.setTextColor(Color.WHITE)
+            tvMasterStatusSubtitle.text = "Intercepting volume button gestures"
+        } else {
+            tvMasterStatusTitle.text = "TWEAK SUSPENDED"
+            tvMasterStatusTitle.setTextColor(Color.parseColor("#E50914"))
+            tvMasterStatusSubtitle.text = "Volume buttons 100% normal (tweak sleeping)"
         }
     }
 
@@ -400,14 +507,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showActionPicker(title: String, options: List<String>, current: String, onSelect: (String) -> Unit) {
-        val labels = options.map { formatActionLabel(it) }.toTypedArray()
-        val currentIndex = options.indexOf(current).coerceAtLeast(0)
+    private fun showActionPicker(title: String, currentActionId: String, onSelect: (String) -> Unit) {
+        val actions = ActionRegistry.ALL_ACTIONS
+        val labels = actions.map { "${it.title}  •  ${it.category}" }.toTypedArray()
+        val currentIndex = actions.indexOfFirst { it.id == currentActionId }.coerceAtLeast(0)
 
         AlertDialog.Builder(this)
             .setTitle(title)
             .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
-                onSelect(options[which])
+                onSelect(actions[which].id)
                 dialog.dismiss()
             }
             .setNegativeButton("Cancel", null)
@@ -555,14 +663,14 @@ class MainActivity : AppCompatActivity() {
             }
             .setPositiveButton("Save") { _, _ ->
                 val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
-                prefs.edit().putStringSet("whitelist_packages", currentSelected).apply()
+                prefs.edit().putStringSet("target_apps", currentSelected).apply()
                 VolumeTweakService.targetAppPackages = currentSelected
                 updateWhitelistSummaryUI(currentSelected)
                 LogBuffer.log("Whitelist: ${currentSelected.size} apps selected")
             }
             .setNeutralButton("Clear (All Apps)") { _, _ ->
                 val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
-                prefs.edit().putStringSet("whitelist_packages", emptySet()).apply()
+                prefs.edit().putStringSet("target_apps", emptySet()).apply()
                 VolumeTweakService.targetAppPackages = emptySet()
                 updateWhitelistSummaryUI(emptySet())
                 LogBuffer.log("Whitelist cleared: All media apps enabled")

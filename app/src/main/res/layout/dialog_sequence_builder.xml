@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#121212"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SEQUENCE BUILDER"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tap buttons in order to chain physical button gestures."
+            android:textColor="#888888"
+            android:textSize="12sp"
+            android:layout_marginTop="4dp" />
+
+        <!-- Sequence Preview Box -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_stat_box"
+            android:padding="14dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="INPUT CHAIN"
+                android:textColor="#7A7A7A"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvBuilderSequenceDisplay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Dual Press"
+                android:textColor="#FFFFFF"
+                android:textSize="14.5sp"
+                android:textStyle="bold"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <!-- Input Buttons Grid -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TAP TO APPEND STEP"
+            android:textColor="#666666"
+            android:textSize="10.5sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp" />
+
+        <!-- Row 1: Dual Press / Dual Hold -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTokenDual"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="+ Dual Press"
+                android:textSize="12sp"
+                app:backgroundTint="#202020"
+                android:textColor="#FFFFFF"
+                app:cornerRadius="10dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTokenDualHold"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="+ Hold Dual"
+                android:textSize="12sp"
+                app:backgroundTint="#202020"
+                android:textColor="#FFFFFF"
+                app:cornerRadius="10dp" />
+        </LinearLayout>
+
+        <!-- Row 2: Vol Up / Hold Vol Up -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTokenUp"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="+ Vol UP"
+                android:textSize="12sp"
+                app:backgroundTint="#202020"
+                android:textColor="#FFFFFF"
+                app:cornerRadius="10dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTokenUpHold"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="+ Hold Vol UP"
+                android:textSize="12sp"
+                app:backgroundTint="#202020"
+                android:textColor="#FFFFFF"
+                app:cornerRadius="10dp" />
+        </LinearLayout>
+
+        <!-- Row 3: Vol Down / Hold Vol Down -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTokenDown"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="+ Vol DOWN"
+                android:textSize="12sp"
+                app:backgroundTint="#202020"
+                android:textColor="#FFFFFF"
+                app:cornerRadius="10dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTokenDownHold"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="+ Hold Vol DOWN"
+                android:textSize="12sp"
+                app:backgroundTint="#202020"
+                android:textColor="#FFFFFF"
+                app:cornerRadius="10dp" />
+        </LinearLayout>
+
+        <!-- Edit Tools: Backspace & Clear -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTokenBackspace"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="⌫ Remove Last"
+                android:textColor="#A0A0A0"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnTokenClear"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Clear All"
+                android:textColor="#D71921"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Action Selector Row -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TRIGGER ACTION"
+            android:textColor="#666666"
+            android:textSize="10.5sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp" />
+
+        <LinearLayout
+            android:id="@+id/rowBuilderSelectAction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_stat_box"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="14dp"
+            android:clickable="true"
+            android:focusable="true">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvBuilderActionTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Fast Forward 15s"
+                    android:textColor="#D71921"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvBuilderActionDesc"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tap to change assigned action"
+                    android:textColor="#7A7A7A"
+                    android:textSize="11.5sp"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                app:srcCompat="@drawable/ic_chevron_right" />
+        </LinearLayout>
+
+        <!-- Action Buttons: Cancel & Save -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="22dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBuilderCancel"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="CANCEL"
+                android:textColor="#A0A0A0" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBuilderSave"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="SAVE SEQUENCE"
+                android:textColor="#FFFFFF"
+                app:backgroundTint="#D71921"
+                app:cornerRadius="12dp" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

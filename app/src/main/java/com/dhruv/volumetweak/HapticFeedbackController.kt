@@ -69,4 +69,21 @@ object HapticFeedbackController {
             LogBuffer.log("[HAPTIC] Error: ${e.message}")
         }
     }
+
+    fun vibrateTick(context: Context) {
+        init(context)
+        val vib = vibrator ?: return
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vib.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vib.vibrate(VibrationEffect.createOneShot(25, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vib.vibrate(25)
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
+    }
 }
