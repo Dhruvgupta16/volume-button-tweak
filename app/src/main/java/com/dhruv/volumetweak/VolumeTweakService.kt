@@ -46,9 +46,11 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     private val currentSequence = mutableListOf<String>()
     private var isSequenceActive = false
     private var isDualPressActive = false
+    private var isDualTokenEmitted = false
     private var isHoldTriggered = false
     private var activeHoldRunnable: Runnable? = null
     private var pendingSequenceTimeoutRunnable: Runnable? = null
+    private var lastActionExecuteTime: Long = 0
 
     // Session memory to support resume when music was paused via tweak
     private var lastTweakActionTime: Long = 0
@@ -78,10 +80,10 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         var dualPressWindowMs: Long = 140L
         var pauseSessionTimeoutMs: Long = 30000L
 
-        private const val DEFER_SINGLE_PRESS_MS = 85L
         private const val HOLD_THRESHOLD_MS = 450L
         private const val SEQUENCE_STEP_TIMEOUT_MS = 500L
         private const val CONTINUOUS_RAMP_INTERVAL_MS = 110L
+        private const val POST_ACTION_COOLDOWN_MS = 350L
 
         fun reloadPreferences(context: Context) {
             val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
@@ -228,6 +230,16 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         }
 
         val currentTime = SystemClock.uptimeMillis()
+
+        // Post-Action Cooldown: swallow any bouncing releases or trailing taps immediately following an executed gesture
+        if (currentTime - lastActionExecuteTime < POST_ACTION_COOLDOWN_MS) {
+            if (action == KeyEvent.ACTION_UP) {
+                if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolUpPressed = false
+                if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) isVolDownPressed = false
+            }
+            return true
+        }
+
         val isMusicActive = audioManager.isMusicActive
         val timeSinceLastAction = currentTime - lastTweakActionTime
         val isRecentPauseSession = timeSinceLastAction < pauseSessionTimeoutMs
@@ -245,6 +257,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             isVolUpPressed = false
             isVolDownPressed = false
             isDualPressActive = false
+            isDualTokenEmitted = false
             cancelContinuousVolumeRamp()
             cancelPendingSinglePress()
             return false
@@ -271,12 +284,14 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 cancelActiveHoldTimer()
 
                 isDualPressActive = true
+                isDualTokenEmitted = false
                 isHoldTriggered = false
 
                 // Start Dual Hold Timer (500ms)
                 activeHoldRunnable = Runnable {
                     if (isVolUpPressed && isVolDownPressed) {
                         isHoldTriggered = true
+                        isDualTokenEmitted = true
                         HapticFeedbackController.vibrateTick(this@VolumeTweakService)
                         LogBuffer.log("[INPUT] Token: DUAL_HOLD")
                         appendTokenAndEvaluate("DUAL_HOLD")
@@ -327,12 +342,14 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
             // 1. Releasing from Dual Press
             if (isDualPressActive) {
-                if (!isHoldTriggered) {
+                if (!isHoldTriggered && !isDualTokenEmitted) {
+                    isDualTokenEmitted = true
                     LogBuffer.log("[INPUT] Token: DUAL")
                     appendTokenAndEvaluate("DUAL")
                 }
                 if (!isVolUpPressed && !isVolDownPressed) {
                     isDualPressActive = false
+                    isDualTokenEmitted = false
                     isHoldTriggered = false
                 }
                 return true
@@ -376,7 +393,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             }
         }
         pendingSinglePressRunnable = runnable
-        handler.postDelayed(runnable, DEFER_SINGLE_PRESS_MS)
+        handler.postDelayed(runnable, dualPressWindowMs + 10L)
     }
 
     private fun startContinuousVolumeRamp(keyCode: Int) {
@@ -490,6 +507,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     }
 
     private fun executeConfiguredAction(actionId: String) {
+        lastActionExecuteTime = SystemClock.uptimeMillis()
         if (glyphReactionEnabled) {
             GlyphController.pulse(1)
         }
