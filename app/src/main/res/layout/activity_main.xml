@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#070707"
+    android:background="#000000"
     android:fillViewport="true">
 
     <LinearLayout
@@ -12,13 +12,13 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Header Card: Title, Version, Update Button, Accessibility Status -->
+        <!-- Header Card: Title, Nothing Dot Logo, Version, Update Button -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:cardBackgroundColor="#121212"
-            app:cardCornerRadius="16dp"
-            app:strokeColor="#222222"
+            app:cardBackgroundColor="#0D0D0D"
+            app:cardCornerRadius="18dp"
+            app:strokeColor="#1F1F1F"
             app:strokeWidth="1dp"
             app:cardElevation="0dp">
 
@@ -35,24 +35,37 @@
                     <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical">
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
-                        <TextView
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            app:srcCompat="@drawable/ic_nothing_logo" />
+
+                        <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Volume Button Tweak"
-                            android:textColor="#FFFFFF"
-                            android:textSize="20sp"
-                            android:textStyle="bold" />
+                            android:orientation="vertical"
+                            android:layout_marginStart="10dp">
 
-                        <TextView
-                            android:id="@+id/tvAppVersion"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="v1.6 (Build 7)"
-                            android:textColor="#7A7A7A"
-                            android:textSize="11sp"
-                            android:layout_marginTop="2dp" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="VOLUME TWEAK"
+                                android:textColor="#FFFFFF"
+                                android:textSize="17sp"
+                                android:textStyle="bold"
+                                android:letterSpacing="0.06" />
+
+                            <TextView
+                                android:id="@+id/tvAppVersion"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="v1.8 (Build 9)"
+                                android:textColor="#7A7A7A"
+                                android:textSize="11sp" />
+                        </LinearLayout>
                     </LinearLayout>
 
                     <!-- Check for Updates Pill Button -->
@@ -62,9 +75,9 @@
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
                         android:layout_centerVertical="true"
-                        android:background="#1F1F1F"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="6dp"
+                        android:background="@drawable/bg_pill_badge"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="7dp"
                         android:gravity="center_vertical"
                         android:clickable="true"
                         android:focusable="true">
@@ -73,7 +86,7 @@
                             android:id="@+id/ivUpdateIcon"
                             android:layout_width="14dp"
                             android:layout_height="14dp"
-                            android:src="@drawable/ic_refresh"
+                            app:srcCompat="@drawable/ic_refresh"
                             app:tint="#D0D0D0" />
 
                         <TextView
@@ -88,20 +101,24 @@
                     </LinearLayout>
                 </RelativeLayout>
 
-                <!-- Accessibility Status & Enable Button -->
+                <!-- Accessibility Permission Status Banner -->
                 <LinearLayout
+                    android:id="@+id/layoutPermissionBanner"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:layout_marginTop="14dp">
+                    android:layout_marginTop="14dp"
+                    android:background="#141414"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="8dp">
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Accessibility Permission"
-                        android:textColor="#8A8A8A"
+                        android:text="Accessibility Service"
+                        android:textColor="#9E9E9E"
                         android:textSize="12sp" />
 
                     <TextView
@@ -110,31 +127,33 @@
                         android:layout_height="wrap_content"
                         android:text="DISABLED"
                         android:textColor="#E50914"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.05" />
                 </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnEnableService"
                     android:layout_width="match_parent"
-                    android:layout_height="44dp"
-                    android:layout_marginTop="10dp"
-                    android:text="Enable Accessibility Service"
+                    android:layout_height="46dp"
+                    android:layout_marginTop="8dp"
+                    android:text="Grant Accessibility Permission"
                     android:textColor="#FFFFFF"
                     android:textSize="13sp"
-                    app:backgroundTint="#E50914"
-                    app:cornerRadius="10dp" />
+                    android:textStyle="bold"
+                    app:backgroundTint="#D71921"
+                    app:cornerRadius="12dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Master Kill / Suspend Switch Card -->
+        <!-- Master Kill / Suspend Switch Widget -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardBackgroundColor="#121212"
-            app:cardCornerRadius="16dp"
-            app:strokeColor="#222222"
+            app:cardBackgroundColor="#0D0D0D"
+            app:cardCornerRadius="18dp"
+            app:strokeColor="#1F1F1F"
             app:strokeWidth="1dp"
             app:cardElevation="0dp">
 
@@ -143,22 +162,39 @@
                 android:layout_height="wrap_content"
                 android:padding="16dp">
 
+                <FrameLayout
+                    android:id="@+id/framePowerIcon"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:layout_centerVertical="true"
+                    android:background="@drawable/bg_icon_circle">
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="center"
+                        app:srcCompat="@drawable/ic_power"
+                        app:tint="#FFFFFF" />
+                </FrameLayout>
+
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
+                    android:layout_toEndOf="@id/framePowerIcon"
                     android:layout_toStartOf="@id/switchMasterKill"
-                    android:layout_alignParentStart="true"
-                    android:layout_centerVertical="true">
+                    android:layout_centerVertical="true"
+                    android:layout_marginStart="14dp">
 
                     <TextView
                         android:id="@+id/tvMasterStatusTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Service Status: ACTIVE"
+                        android:text="TWEAK ACTIVE"
                         android:textColor="#FFFFFF"
                         android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        android:letterSpacing="0.05" />
 
                     <TextView
                         android:id="@+id/tvMasterStatusSubtitle"
@@ -180,79 +216,124 @@
             </RelativeLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Resource Monitor Card -->
-        <com.google.android.material.card.MaterialCardView
+        <!-- Live Performance Stat Boxes (Side by Side) -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            app:cardBackgroundColor="#121212"
-            app:cardCornerRadius="16dp"
-            app:strokeColor="#222222"
-            app:strokeWidth="1dp"
-            app:cardElevation="0dp">
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
 
+            <!-- RAM Stat Box -->
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="14dp">
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_stat_box"
+                android:orientation="vertical"
+                android:padding="12dp">
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_memory"
-                        app:tint="#808080" />
+                    <FrameLayout
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:background="@drawable/bg_icon_circle">
+
+                        <ImageView
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ic_memory"
+                            app:tint="#A0A0A0" />
+                    </FrameLayout>
 
                     <TextView
-                        android:id="@+id/tvRamUsage"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
-                        android:text="RAM: -- MB"
-                        android:textColor="#D0D0D0"
-                        android:textSize="11.5sp" />
+                        android:text="APP RAM"
+                        android:textColor="#7A7A7A"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.05" />
                 </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="0dp"
+                <TextView
+                    android:id="@+id/tvRamUsage"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_cpu"
-                        app:tint="#808080" />
-
-                    <TextView
-                        android:id="@+id/tvCpuUsage"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:text="CPU: &lt; 0.1%"
-                        android:textColor="#D0D0D0"
-                        android:textSize="11.5sp" />
-                </LinearLayout>
+                    android:layout_marginTop="8dp"
+                    android:text="-- MB"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+
+            <!-- CPU Stat Box -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_stat_box"
+                android:orientation="vertical"
+                android:padding="12dp">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <FrameLayout
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:background="@drawable/bg_icon_circle">
+
+                        <ImageView
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ic_cpu"
+                            app:tint="#A0A0A0" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="CPU LOAD"
+                        android:textColor="#7A7A7A"
+                        android:textSize="10.5sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.05" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvCpuUsage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="&lt; 0.1%"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
 
         <!-- Gesture Customization & Modding Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardBackgroundColor="#121212"
-            app:cardCornerRadius="16dp"
-            app:strokeColor="#222222"
+            app:cardBackgroundColor="#0D0D0D"
+            app:cardCornerRadius="18dp"
+            app:strokeColor="#1F1F1F"
             app:strokeWidth="1dp"
             app:cardElevation="0dp">
 
@@ -269,18 +350,19 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Gesture Customization"
+                        android:text="GESTURE REMAPPER"
                         android:textColor="#FFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                        android:textSize="12.5sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.06" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
                         android:text="TAP ROW TO REASSIGN"
-                        android:textColor="#555555"
-                        android:textSize="9sp"
+                        android:textColor="#5A5A5A"
+                        android:textSize="9.5sp"
                         android:textStyle="bold" />
                 </RelativeLayout>
 
@@ -291,40 +373,67 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingVertical="8dp"
-                    android:layout_marginTop="6dp"
+                    android:paddingVertical="10dp"
+                    android:layout_marginTop="8dp"
                     android:clickable="true"
                     android:focusable="true">
 
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_play_pause"
-                        app:tint="#D0D0D0" />
+                    <FrameLayout
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@drawable/bg_icon_circle">
 
-                    <TextView
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ic_play_pause"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
+
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginStart="10dp"
-                        android:text="1 Click (Vol Up + Down)"
-                        android:textColor="#D0D0D0"
-                        android:textSize="12sp" />
+                        android:orientation="vertical"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="1 Click (Dual Press)"
+                            android:textColor="#E0E0E0"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Press Vol Up + Down simultaneously"
+                            android:textColor="#666666"
+                            android:textSize="11sp" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/tvAction1"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Play / Pause"
-                        android:textColor="#E50914"
+                        android:textColor="#D71921"
                         android:textSize="12sp"
                         android:textStyle="bold" />
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginStart="6dp"
+                        app:srcCompat="@drawable/ic_chevron_right" />
                 </LinearLayout>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="#1A1A1A" />
+                    android:background="#181818" />
 
                 <!-- 2 Clicks -->
                 <LinearLayout
@@ -333,39 +442,66 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingVertical="8dp"
+                    android:paddingVertical="10dp"
                     android:clickable="true"
                     android:focusable="true">
 
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_skip_next"
-                        app:tint="#D0D0D0" />
+                    <FrameLayout
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@drawable/bg_icon_circle">
 
-                    <TextView
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ic_skip_next"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
+
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginStart="10dp"
-                        android:text="2 Clicks"
-                        android:textColor="#D0D0D0"
-                        android:textSize="12sp" />
+                        android:orientation="vertical"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="2 Clicks"
+                            android:textColor="#E0E0E0"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Double press Vol Up + Down"
+                            android:textColor="#666666"
+                            android:textSize="11sp" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/tvAction2"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Next Track"
-                        android:textColor="#E50914"
+                        android:textColor="#D71921"
                         android:textSize="12sp"
                         android:textStyle="bold" />
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginStart="6dp"
+                        app:srcCompat="@drawable/ic_chevron_right" />
                 </LinearLayout>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="#1A1A1A" />
+                    android:background="#181818" />
 
                 <!-- 3 Clicks -->
                 <LinearLayout
@@ -374,65 +510,113 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingVertical="8dp"
+                    android:paddingVertical="10dp"
                     android:clickable="true"
                     android:focusable="true">
 
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_skip_previous"
-                        app:tint="#D0D0D0" />
+                    <FrameLayout
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@drawable/bg_icon_circle">
 
-                    <TextView
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ic_skip_previous"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
+
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginStart="10dp"
-                        android:text="3 Clicks"
-                        android:textColor="#D0D0D0"
-                        android:textSize="12sp" />
+                        android:orientation="vertical"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="3 Clicks"
+                            android:textColor="#E0E0E0"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Triple press Vol Up + Down"
+                            android:textColor="#666666"
+                            android:textSize="11sp" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/tvAction3"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Previous Track"
-                        android:textColor="#E50914"
+                        android:textColor="#D71921"
                         android:textSize="12sp"
                         android:textStyle="bold" />
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginStart="6dp"
+                        app:srcCompat="@drawable/ic_chevron_right" />
                 </LinearLayout>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="#1A1A1A" />
+                    android:background="#181818" />
 
-                <!-- Timing Sensitivity Row -->
+                <!-- Sensitivity Row -->
                 <LinearLayout
                     android:id="@+id/rowSensitivity"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:paddingVertical="8dp"
+                    android:paddingVertical="10dp"
                     android:clickable="true"
                     android:focusable="true">
 
-                    <ImageView
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:src="@drawable/ic_tune"
-                        app:tint="#808080" />
+                    <FrameLayout
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:background="@drawable/bg_icon_circle">
 
-                    <TextView
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ic_tune"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
+
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginStart="10dp"
-                        android:text="Dual-Press Window"
-                        android:textColor="#A0A0A0"
-                        android:textSize="12sp" />
+                        android:orientation="vertical"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Sensitivity Window"
+                            android:textColor="#E0E0E0"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Dual-press detection speed"
+                            android:textColor="#666666"
+                            android:textSize="11sp" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/tvSensitivity"
@@ -442,18 +626,24 @@
                         android:textColor="#FFFFFF"
                         android:textSize="12sp"
                         android:textStyle="bold" />
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginStart="6dp"
+                        app:srcCompat="@drawable/ic_chevron_right" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Feature Toggles Card -->
+        <!-- Hardware Preferences Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            app:cardBackgroundColor="#121212"
-            app:cardCornerRadius="16dp"
-            app:strokeColor="#222222"
+            app:cardBackgroundColor="#0D0D0D"
+            app:cardCornerRadius="18dp"
+            app:strokeColor="#1F1F1F"
             app:strokeWidth="1dp"
             app:cardElevation="0dp">
 
@@ -463,55 +653,227 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/switchHaptic"
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="HARDWARE PREFERENCES"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.06" />
+
+                <!-- Haptic Switch -->
+                <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Vibration Haptics on Action"
-                    android:textColor="#E0E0E0"
-                    android:textSize="13sp" />
+                    android:layout_marginTop="12dp">
 
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/switchGlyph"
+                    <FrameLayout
+                        android:id="@+id/iconHaptic"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:background="@drawable/bg_icon_circle">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ic_vibrate"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_toEndOf="@id/iconHaptic"
+                        android:layout_toStartOf="@id/switchHaptic"
+                        android:layout_centerVertical="true"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Vibration Haptics"
+                            android:textColor="#E0E0E0"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Tactile pulses on gesture trigger"
+                            android:textColor="#666666"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchHaptic"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true" />
+                </RelativeLayout>
+
+                <View
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="Glyph Light Flash on Action"
-                    android:textColor="#E0E0E0"
-                    android:textSize="13sp" />
+                    android:layout_height="1dp"
+                    android:background="#181818"
+                    android:layout_marginVertical="8dp" />
 
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/switchTestMode"
+                <!-- Glyph Switch -->
+                <RelativeLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="Test Mode (bypass music check)"
-                    android:textColor="#E0E0E0"
-                    android:textSize="13sp" />
+                    android:layout_height="wrap_content">
 
-                <!-- Whitelist Selector -->
+                    <FrameLayout
+                        android:id="@+id/iconGlyph"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:background="@drawable/bg_icon_circle">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ic_light"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_toEndOf="@id/iconGlyph"
+                        android:layout_toStartOf="@id/switchGlyph"
+                        android:layout_centerVertical="true"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Glyph Flash Reaction"
+                            android:textColor="#E0E0E0"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Nothing Phone (2a) rear LED flashes"
+                            android:textColor="#666666"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchGlyph"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true" />
+                </RelativeLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#181818"
+                    android:layout_marginVertical="8dp" />
+
+                <!-- Test Mode Switch -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <FrameLayout
+                        android:id="@+id/iconTestMode"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:background="@drawable/bg_icon_circle">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ic_flask"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_toEndOf="@id/iconTestMode"
+                        android:layout_toStartOf="@id/switchTestMode"
+                        android:layout_centerVertical="true"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Test Mode"
+                            android:textColor="#E0E0E0"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Bypass music requirement for debugging"
+                            android:textColor="#666666"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchTestMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true" />
+                </RelativeLayout>
+
+                <!-- Whitelist Selector Box -->
                 <LinearLayout
                     android:id="@+id/layoutWhitelistSelector"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
-                    android:background="#1A1A1A"
+                    android:background="#141414"
                     android:padding="12dp"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="12dp"
                     android:clickable="true"
                     android:focusable="true">
+
+                    <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_icon_circle">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ic_apps"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
 
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:orientation="vertical"
+                        android:layout_marginStart="12dp">
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Whitelisted Media Apps"
+                            android:text="Media App Whitelist"
                             android:textColor="#FFFFFF"
                             android:textSize="13sp"
                             android:textStyle="bold" />
@@ -521,7 +883,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="All Media Apps (No Filter)"
-                            android:textColor="#A0A0A0"
+                            android:textColor="#888888"
                             android:textSize="11.5sp"
                             android:layout_marginTop="2dp" />
                     </LinearLayout>
@@ -531,11 +893,11 @@
                         android:layout_height="wrap_content"
                         android:text="SELECT"
                         android:textColor="#FFFFFF"
-                        android:textSize="12sp"
+                        android:textSize="11sp"
                         android:textStyle="bold"
-                        android:background="#2E2E2E"
-                        android:paddingHorizontal="10dp"
-                        android:paddingVertical="5dp" />
+                        android:background="@drawable/bg_pill_badge"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="6dp" />
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -543,12 +905,12 @@
         <!-- Real-time Console Log Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
-            android:layout_height="220dp"
+            android:layout_height="230dp"
             android:layout_marginTop="12dp"
             android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="#121212"
-            app:cardCornerRadius="16dp"
-            app:strokeColor="#222222"
+            app:cardBackgroundColor="#0D0D0D"
+            app:cardCornerRadius="18dp"
+            app:strokeColor="#1F1F1F"
             app:strokeWidth="1dp"
             app:cardElevation="0dp">
 
@@ -560,16 +922,33 @@
 
                 <RelativeLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="4dp"
+                    android:paddingTop="2dp">
 
-                    <TextView
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_centerVertical="true"
-                        android:text="Event Console"
-                        android:textColor="#FFFFFF"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_centerVertical="true">
+
+                        <View
+                            android:layout_width="7dp"
+                            android:layout_height="7dp"
+                            android:background="@drawable/bg_icon_circle"
+                            android:backgroundTint="#4CAF50" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:text="EVENT CONSOLE"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.06" />
+                    </LinearLayout>
 
                     <LinearLayout
                         android:layout_width="wrap_content"
@@ -578,22 +957,38 @@
                         android:layout_centerVertical="true"
                         android:orientation="horizontal">
 
-                        <ImageView
+                        <FrameLayout
                             android:id="@+id/btnCopyLogs"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_marginEnd="16dp"
-                            android:src="@drawable/ic_copy"
-                            android:contentDescription="Copy Logs"
-                            app:tint="#808080" />
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:layout_marginEnd="8dp"
+                            android:background="@drawable/bg_icon_circle"
+                            android:clickable="true"
+                            android:focusable="true">
 
-                        <ImageView
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_gravity="center"
+                                app:srcCompat="@drawable/ic_copy"
+                                app:tint="#B0B0B0" />
+                        </FrameLayout>
+
+                        <FrameLayout
                             android:id="@+id/btnClearLogs"
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:src="@drawable/ic_delete"
-                            android:contentDescription="Clear Logs"
-                            app:tint="#808080" />
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:background="@drawable/bg_icon_circle"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_gravity="center"
+                                app:srcCompat="@drawable/ic_delete"
+                                app:tint="#B0B0B0" />
+                        </FrameLayout>
                     </LinearLayout>
                 </RelativeLayout>
 
@@ -601,7 +996,7 @@
                     android:id="@+id/scrollLogs"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="8dp"
                     android:background="#050505"
                     android:padding="8dp">
 
@@ -612,7 +1007,7 @@
                         android:fontFamily="monospace"
                         android:text="Awaiting events..."
                         android:textColor="#4CAF50"
-                        android:textSize="10sp" />
+                        android:textSize="10.5sp" />
                 </ScrollView>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>

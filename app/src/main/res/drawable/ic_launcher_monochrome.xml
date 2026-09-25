@@ -5,28 +5,26 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Nothing-Style Volume Rocker Glyph (Tactile Pills) -->
     <!-- Volume Up Pill -->
     <path
-        android:fillColor="#E8E8E8"
+        android:fillColor="#FFFFFF"
         android:pathData="M 36,36 C 36,33.8 37.8,32 40,32 L 44,32 C 46.2,32 48,33.8 48,36 L 48,49 C 48,51.2 46.2,53 44,53 L 40,53 C 37.8,53 36,51.2 36,49 Z" />
 
-    <!-- Plus Symbol in Volume Up Pill -->
+    <!-- Plus cutout in Volume Up -->
     <path
-        android:fillColor="#0D0D0D"
+        android:fillColor="#000000"
         android:pathData="M 41,40 L 43,40 L 43,45 L 41,45 Z M 38.5,41.5 L 45.5,41.5 L 45.5,43.5 L 38.5,43.5 Z" />
 
     <!-- Volume Down Pill -->
     <path
-        android:fillColor="#E8E8E8"
+        android:fillColor="#FFFFFF"
         android:pathData="M 36,57 C 36,54.8 37.8,53 40,53 L 44,53 C 46.2,53 48,54.8 48,57 L 48,70 C 48,72.2 46.2,74 44,74 L 40,74 C 37.8,74 36,72.2 36,70 Z" />
 
-    <!-- Minus Symbol in Volume Down Pill -->
+    <!-- Minus cutout in Volume Down -->
     <path
-        android:fillColor="#0D0D0D"
+        android:fillColor="#000000"
         android:pathData="M 38.5,62.5 L 45.5,62.5 L 45.5,64.5 L 38.5,64.5 Z" />
 
-    <!-- Audio / Media Waves in Nothing Minimalist Style -->
     <!-- Inner Sound Arc -->
     <path
         android:strokeColor="#FFFFFF"
@@ -36,12 +34,12 @@
 
     <!-- Outer Sound Arc -->
     <path
-        android:strokeColor="#A0A0A0"
+        android:strokeColor="#FFFFFF"
         android:strokeWidth="2.8"
         android:strokeLineCap="round"
         android:pathData="M 62,41 C 68,47 68,61 62,67" />
 
-    <!-- Distant Sound Dots (Nothing Ndot Style) -->
+    <!-- Sound Dots -->
     <path
         android:fillColor="#FFFFFF"
         android:pathData="M 70,54 m -2,0 a 2,2 0 1,0 4,0 a 2,2 0 1,0 -4,0" />
@@ -52,9 +50,9 @@
         android:fillColor="#FFFFFF"
         android:pathData="M 70,62 m -1.6,0 a 1.6,1.6 0 1,0 3.2,0 a 1.6,1.6 0 1,0 -3.2,0" />
 
-    <!-- Signature Nothing OS Red Dot Accent -->
+    <!-- Top Accent Dot (White in monochrome mode) -->
     <path
-        android:fillColor="#D71921"
+        android:fillColor="#FFFFFF"
         android:pathData="M 71,36 m -3.5,0 a 3.5,3.5 0 1,0 7,0 a 3.5,3.5 0 1,0 -7,0" />
 
 </vector>
