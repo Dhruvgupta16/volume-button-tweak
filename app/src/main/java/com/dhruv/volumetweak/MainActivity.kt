@@ -57,8 +57,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var tvLogs: TextView
     private lateinit var scrollLogs: ScrollView
-    private lateinit var btnClearLogs: ImageView
-    private lateinit var btnCopyLogs: ImageView
+    private lateinit var btnClearLogs: View
+    private lateinit var btnCopyLogs: View
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
@@ -109,7 +109,7 @@ class MainActivity : AppCompatActivity() {
         // Dynamic Version Display
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
-            currentVersionName = pInfo.versionName ?: "1.9"
+            currentVersionName = pInfo.versionName ?: "1.9.1"
             val vCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 pInfo.longVersionCode
             } else {
@@ -117,7 +117,7 @@ class MainActivity : AppCompatActivity() {
             }
             tvAppVersion.text = "v$currentVersionName (Build $vCode)"
         } catch (e: Exception) {
-            tvAppVersion.text = "v1.9 (Build 10)"
+            tvAppVersion.text = "v1.9.1 (Build 11)"
         }
 
         // Check for Updates
