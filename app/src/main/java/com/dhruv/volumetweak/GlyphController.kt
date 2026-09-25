@@ -10,6 +10,7 @@ object GlyphController {
     private val handler = Handler(Looper.getMainLooper())
     private var cameraManager: CameraManager? = null
     private var cameraId: String? = null
+    private var isTorchOn = false
 
     fun init(context: Context) {
         try {
@@ -51,6 +52,19 @@ object GlyphController {
             }, delay)
 
             delay += 60L
+        }
+    }
+
+    fun toggleTorch(): Boolean {
+        val cid = cameraId ?: return false
+        val cm = cameraManager ?: return false
+        return try {
+            isTorchOn = !isTorchOn
+            cm.setTorchMode(cid, isTorchOn)
+            isTorchOn
+        } catch (e: Exception) {
+            isTorchOn = false
+            false
         }
     }
 }

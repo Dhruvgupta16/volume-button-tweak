@@ -46,10 +46,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvAction2: TextView
     private lateinit var rowGesture3: View
     private lateinit var tvAction3: TextView
+    private lateinit var rowGesture4: View
+    private lateinit var tvAction4: TextView
     private lateinit var rowSensitivity: View
     private lateinit var tvSensitivity: TextView
 
+    private lateinit var switchCombo: MaterialSwitch
+    private lateinit var layoutComboOptions: View
+    private lateinit var rowComboUp: View
+    private lateinit var tvComboUpAction: TextView
+    private lateinit var rowComboDown: View
+    private lateinit var tvComboDownAction: TextView
+
     private lateinit var switchHaptic: MaterialSwitch
+    private lateinit var switchProximity: MaterialSwitch
     private lateinit var switchGlyph: MaterialSwitch
     private lateinit var switchTestMode: MaterialSwitch
     private lateinit var layoutWhitelistSelector: View
@@ -62,7 +72,20 @@ class MainActivity : AppCompatActivity() {
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
-    private var currentVersionName: String = "1.6"
+    private var currentVersionName: String = "1.9.2"
+
+    private val allActionOptions = listOf(
+        "PLAY_PAUSE",
+        "NEXT",
+        "PREV",
+        "FAST_FORWARD",
+        "REWIND",
+        "MUTE",
+        "VOL_MAX",
+        "VOL_MIN",
+        "FLASHLIGHT_TOGGLE",
+        "VOICE_ASSISTANT"
+    )
 
     data class AppItem(val label: String, val packageName: String)
 
@@ -90,10 +113,20 @@ class MainActivity : AppCompatActivity() {
         tvAction2 = findViewById(R.id.tvAction2)
         rowGesture3 = findViewById(R.id.rowGesture3)
         tvAction3 = findViewById(R.id.tvAction3)
+        rowGesture4 = findViewById(R.id.rowGesture4)
+        tvAction4 = findViewById(R.id.tvAction4)
         rowSensitivity = findViewById(R.id.rowSensitivity)
         tvSensitivity = findViewById(R.id.tvSensitivity)
 
+        switchCombo = findViewById(R.id.switchCombo)
+        layoutComboOptions = findViewById(R.id.layoutComboOptions)
+        rowComboUp = findViewById(R.id.rowComboUp)
+        tvComboUpAction = findViewById(R.id.tvComboUpAction)
+        rowComboDown = findViewById(R.id.rowComboDown)
+        tvComboDownAction = findViewById(R.id.tvComboDownAction)
+
         switchHaptic = findViewById(R.id.switchHaptic)
+        switchProximity = findViewById(R.id.switchProximity)
         switchGlyph = findViewById(R.id.switchGlyph)
         switchTestMode = findViewById(R.id.switchTestMode)
         layoutWhitelistSelector = findViewById(R.id.layoutWhitelistSelector)
@@ -109,7 +142,7 @@ class MainActivity : AppCompatActivity() {
         // Dynamic Version Display
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
-            currentVersionName = pInfo.versionName ?: "1.9.1"
+            currentVersionName = pInfo.versionName ?: "1.9.2"
             val vCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 pInfo.longVersionCode
             } else {
@@ -117,7 +150,7 @@ class MainActivity : AppCompatActivity() {
             }
             tvAppVersion.text = "v$currentVersionName (Build $vCode)"
         } catch (e: Exception) {
-            tvAppVersion.text = "v1.9.1 (Build 11)"
+            tvAppVersion.text = "v1.9.2 (Build 12)"
         }
 
         // Check for Updates
@@ -158,7 +191,7 @@ class MainActivity : AppCompatActivity() {
         VolumeTweakService.action1Click = action1
         tvAction1.text = formatActionLabel(action1)
         rowGesture1.setOnClickListener {
-            showActionPicker("1 Click Action", listOf("PLAY_PAUSE", "NEXT", "PREV", "MUTE", "FLASHLIGHT"), action1) { selected ->
+            showActionPicker("1 Click Action", allActionOptions, action1) { selected ->
                 prefs.edit().putString("action_1_click", selected).apply()
                 VolumeTweakService.action1Click = selected
                 tvAction1.text = formatActionLabel(selected)
@@ -171,7 +204,7 @@ class MainActivity : AppCompatActivity() {
         VolumeTweakService.action2Clicks = action2
         tvAction2.text = formatActionLabel(action2)
         rowGesture2.setOnClickListener {
-            showActionPicker("2 Clicks Action", listOf("NEXT", "PLAY_PAUSE", "PREV"), action2) { selected ->
+            showActionPicker("2 Clicks Action", allActionOptions, action2) { selected ->
                 prefs.edit().putString("action_2_clicks", selected).apply()
                 VolumeTweakService.action2Clicks = selected
                 tvAction2.text = formatActionLabel(selected)
@@ -184,11 +217,24 @@ class MainActivity : AppCompatActivity() {
         VolumeTweakService.action3Clicks = action3
         tvAction3.text = formatActionLabel(action3)
         rowGesture3.setOnClickListener {
-            showActionPicker("3 Clicks Action", listOf("PREV", "NEXT", "PLAY_PAUSE"), action3) { selected ->
+            showActionPicker("3 Clicks Action", allActionOptions, action3) { selected ->
                 prefs.edit().putString("action_3_clicks", selected).apply()
                 VolumeTweakService.action3Clicks = selected
                 tvAction3.text = formatActionLabel(selected)
                 LogBuffer.log("Config: 3 Clicks -> $selected")
+            }
+        }
+
+        // Gesture Action 4 Customizer
+        val action4 = prefs.getString("action_4_clicks", "FAST_FORWARD") ?: "FAST_FORWARD"
+        VolumeTweakService.action4Clicks = action4
+        tvAction4.text = formatActionLabel(action4)
+        rowGesture4.setOnClickListener {
+            showActionPicker("4 Clicks Action", allActionOptions, action4) { selected ->
+                prefs.edit().putString("action_4_clicks", selected).apply()
+                VolumeTweakService.action4Clicks = selected
+                tvAction4.text = formatActionLabel(selected)
+                LogBuffer.log("Config: 4 Clicks -> $selected")
             }
         }
 
@@ -205,6 +251,43 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Combo Sequences Setup
+        val isCombo = prefs.getBoolean("combo_sequences_enabled", false)
+        switchCombo.isChecked = isCombo
+        VolumeTweakService.comboSequencesEnabled = isCombo
+        layoutComboOptions.visibility = if (isCombo) View.VISIBLE else View.GONE
+
+        switchCombo.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("combo_sequences_enabled", isChecked).apply()
+            VolumeTweakService.comboSequencesEnabled = isChecked
+            layoutComboOptions.visibility = if (isChecked) View.VISIBLE else View.GONE
+            LogBuffer.log("Combo Sequences: ${if (isChecked) "ENABLED" else "DISABLED"}")
+        }
+
+        val comboUp = prefs.getString("combo_dual_up", "FAST_FORWARD") ?: "FAST_FORWARD"
+        VolumeTweakService.comboDualThenUp = comboUp
+        tvComboUpAction.text = formatActionLabel(comboUp)
+        rowComboUp.setOnClickListener {
+            showActionPicker("Dual Press + Vol UP Action", allActionOptions, comboUp) { selected ->
+                prefs.edit().putString("combo_dual_up", selected).apply()
+                VolumeTweakService.comboDualThenUp = selected
+                tvComboUpAction.text = formatActionLabel(selected)
+                LogBuffer.log("Config: Combo UP -> $selected")
+            }
+        }
+
+        val comboDown = prefs.getString("combo_dual_down", "REWIND") ?: "REWIND"
+        VolumeTweakService.comboDualThenDown = comboDown
+        tvComboDownAction.text = formatActionLabel(comboDown)
+        rowComboDown.setOnClickListener {
+            showActionPicker("Dual Press + Vol DOWN Action", allActionOptions, comboDown) { selected ->
+                prefs.edit().putString("combo_dual_down", selected).apply()
+                VolumeTweakService.comboDualThenDown = selected
+                tvComboDownAction.text = formatActionLabel(selected)
+                LogBuffer.log("Config: Combo DOWN -> $selected")
+            }
+        }
+
         // Haptic Feedback Switch
         val isHaptic = prefs.getBoolean("haptic_feedback", true)
         switchHaptic.isChecked = isHaptic
@@ -216,6 +299,16 @@ class MainActivity : AppCompatActivity() {
                 HapticFeedbackController.vibrate(this, 1)
             }
             LogBuffer.log("Haptic feedback: ${if (isChecked) "ENABLED" else "DISABLED"}")
+        }
+
+        // Proximity Sensor Guard Switch
+        val isProximity = prefs.getBoolean("proximity_sensor_guard", false)
+        switchProximity.isChecked = isProximity
+        VolumeTweakService.proximitySensorEnabled = isProximity
+        switchProximity.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("proximity_sensor_guard", isChecked).apply()
+            VolumeTweakService.proximitySensorEnabled = isChecked
+            LogBuffer.log("Proximity Guard: ${if (isChecked) "ENABLED" else "DISABLED"}")
         }
 
         // Test Mode Switch
@@ -286,8 +379,14 @@ class MainActivity : AppCompatActivity() {
             "PLAY_PAUSE" -> "Play / Pause"
             "NEXT" -> "Next Track"
             "PREV" -> "Previous Track"
+            "FAST_FORWARD" -> "Fast Forward 15s"
+            "REWIND" -> "Rewind 15s"
             "MUTE" -> "Toggle Mute"
+            "VOL_MAX" -> "Max Volume (100%)"
+            "VOL_MIN" -> "Quiet Mode (10%)"
+            "FLASHLIGHT_TOGGLE" -> "Flashlight (ON/OFF)"
             "FLASHLIGHT" -> "Flashlight Pulse"
+            "VOICE_ASSISTANT" -> "Voice Assistant"
             else -> action
         }
     }
@@ -495,12 +594,19 @@ class MainActivity : AppCompatActivity() {
         LogBuffer.setListener(null)
     }
 
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_UI_HIDDEN) {
+            System.gc()
+        }
+    }
+
     private fun startPerformanceMonitoring() {
         monitorRunnable = object : Runnable {
             override fun run() {
-                val stats = PerformanceMonitor.getMemoryStats(this@MainActivity)
+                val stats = PerformanceMonitor.getMemoryStats()
                 val cpuStr = PerformanceMonitor.getCpuUsagePercent()
-                tvRamUsage.text = String.format("App: %.1f MB (PSS: %.1f MB)", stats.privateDirtyMb, stats.pssMb)
+                tvRamUsage.text = String.format("Heap: %.1f MB (PSS: %.0fM)", stats.appHeapMb, stats.pssMb)
                 tvCpuUsage.text = "CPU: $cpuStr"
                 monitorHandler.postDelayed(this, 3500)
             }

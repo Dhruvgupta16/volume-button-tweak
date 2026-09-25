@@ -3,6 +3,11 @@ package com.dhruv.volumetweak
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
+import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.AudioPlaybackConfiguration
@@ -14,12 +19,16 @@ import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 
-class VolumeTweakService : AccessibilityService() {
+class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
     private lateinit var audioManager: AudioManager
     private lateinit var powerManager: PowerManager
     private var wakeLock: PowerManager.WakeLock? = null
     private val handler = Handler(Looper.getMainLooper())
+
+    private var sensorManager: SensorManager? = null
+    private var proximitySensor: Sensor? = null
+    private var isProximityCovered = false
 
     private var lastVolUpTime: Long = 0
     private var lastVolDownTime: Long = 0
@@ -35,6 +44,11 @@ class VolumeTweakService : AccessibilityService() {
     private var clickCount = 0
     private var pendingGestureRunnable: Runnable? = null
 
+    // Combo Sequence Engine
+    private var isAwaitingCombo = false
+    private var pendingComboTimeoutRunnable: Runnable? = null
+    private var pendingComboFallbackAction: String = ""
+
     // Session memory to support resume when music was paused via tweak
     private var lastTweakActionTime: Long = 0
 
@@ -46,19 +60,27 @@ class VolumeTweakService : AccessibilityService() {
         var testModeEnabled: Boolean = false
         var glyphReactionEnabled: Boolean = false
         var hapticReactionEnabled: Boolean = true
+        var proximitySensorEnabled: Boolean = false
         var targetAppPackages: Set<String> = emptySet()
 
         // Configurable Gestures
-        var action1Click: String = "PLAY_PAUSE" // "PLAY_PAUSE", "NEXT", "PREV", "MUTE", "FLASHLIGHT"
-        var action2Clicks: String = "NEXT"      // "NEXT", "PLAY_PAUSE", "PREV"
-        var action3Clicks: String = "PREV"      // "PREV", "NEXT", "PLAY_PAUSE"
+        var action1Click: String = "PLAY_PAUSE"
+        var action2Clicks: String = "NEXT"
+        var action3Clicks: String = "PREV"
+        var action4Clicks: String = "FAST_FORWARD"
+
+        // Combo Sequences
+        var comboSequencesEnabled: Boolean = false
+        var comboDualThenUp: String = "FAST_FORWARD"
+        var comboDualThenDown: String = "REWIND"
 
         // Configurable Timings
-        var dualPressWindowMs: Long = 140L      // 100ms, 140ms, 180ms
-        var pauseSessionTimeoutMs: Long = 30000L // 15s, 30s, 60s
-        private const val DEFER_SINGLE_PRESS_MS = 80L  // Deferral for initial key
-        private const val GESTURE_TIMEOUT_MS = 360L    // Multi-click accumulation window
-        private const val CONTINUOUS_RAMP_INTERVAL_MS = 110L // Stock Android volume hold repeat rate
+        var dualPressWindowMs: Long = 140L
+        var pauseSessionTimeoutMs: Long = 30000L
+        private const val DEFER_SINGLE_PRESS_MS = 80L
+        private const val GESTURE_TIMEOUT_MS = 360L
+        private const val CONTINUOUS_RAMP_INTERVAL_MS = 110L
+        private const val COMBO_TIMEOUT_MS = 450L
     }
 
     override fun onCreate() {
@@ -69,9 +91,33 @@ class VolumeTweakService : AccessibilityService() {
         wakeLock?.setReferenceCounted(false)
         GlyphController.init(this)
         HapticFeedbackController.init(this)
+
+        initProximitySensor()
         registerAudioPlaybackMonitoring()
         LogBuffer.log("Service created and ready")
     }
+
+    private fun initProximitySensor() {
+        try {
+            sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+            proximitySensor = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
+            if (proximitySensor != null && proximitySensorEnabled) {
+                sensorManager?.registerListener(this, proximitySensor, SensorManager.SENSOR_DELAY_NORMAL)
+            }
+        } catch (e: Exception) {
+            LogBuffer.log("Proximity init note: ${e.message}")
+        }
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event?.sensor?.type == Sensor.TYPE_PROXIMITY) {
+            val distance = event.values[0]
+            val maxRange = proximitySensor?.maximumRange ?: 5f
+            isProximityCovered = distance < maxRange
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     private fun registerAudioPlaybackMonitoring() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -156,6 +202,22 @@ class VolumeTweakService : AccessibilityService() {
             return super.onKeyEvent(event)
         }
 
+        // Combo Sequence Key Interception
+        if (isAwaitingCombo && action == KeyEvent.ACTION_DOWN) {
+            cancelAwaitingCombo()
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                LogBuffer.log("[COMBO] Dual Press + Vol UP -> $comboDualThenUp")
+                executeConfiguredAction(comboDualThenUp, 1)
+                isDualPressConsumed = true
+                return true
+            } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                LogBuffer.log("[COMBO] Dual Press + Vol DOWN -> $comboDualThenDown")
+                executeConfiguredAction(comboDualThenDown, 1)
+                isDualPressConsumed = true
+                return true
+            }
+        }
+
         val currentTime = SystemClock.uptimeMillis()
         val isMusicActive = audioManager.isMusicActive
         val timeSinceLastAction = currentTime - lastTweakActionTime
@@ -164,7 +226,8 @@ class VolumeTweakService : AccessibilityService() {
 
         // Verify Whitelist against detected playing app or fallback
         val passesWhitelist = isAppWhitelisted()
-        val isEnabledForAction = isEligibleMediaState && passesWhitelist
+        val passesProximity = !proximitySensorEnabled || isProximityCovered
+        val isEnabledForAction = isEligibleMediaState && passesWhitelist && passesProximity
 
         val keyName = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) "Vol UP" else "Vol DOWN"
         val actionName = if (action == KeyEvent.ACTION_DOWN) "DOWN" else "UP"
@@ -174,6 +237,7 @@ class VolumeTweakService : AccessibilityService() {
                 val reason = when {
                     !isEligibleMediaState -> "Audio inactive"
                     !passesWhitelist -> "App not whitelisted"
+                    !passesProximity -> "Proximity sensor clear"
                     else -> "Bypassed"
                 }
                 LogBuffer.log("[BYPASS] $keyName $actionName ($reason)")
@@ -209,7 +273,7 @@ class VolumeTweakService : AccessibilityService() {
                 return true
             }
 
-            // If user is already holding a button for continuous volume adjustment, don't restart deferral
+            // If user is holding a button for continuous volume adjustment, don't restart deferral
             if (continuousRampRunnable != null) {
                 return true
             }
@@ -253,18 +317,15 @@ class VolumeTweakService : AccessibilityService() {
             return targetAppPackages.contains(pkg)
         }
 
-        // Fallback: If detectedPlayingPackage is temporarily null but music is active, allow
         return true
     }
 
     private fun scheduleDeferredSinglePress(keyCode: Int) {
         pendingSinglePressKeyCode = keyCode
         val runnable = Runnable {
-            // First single volume step
             adjustVolume(keyCode)
             pendingSinglePressRunnable = null
 
-            // Start continuous ramping if the button is still being held down!
             val isStillPressed = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolUpPressed else isVolDownPressed
             if (isStillPressed && !isDualPressConsumed) {
                 startContinuousVolumeRamp(keyCode)
@@ -334,7 +395,7 @@ class VolumeTweakService : AccessibilityService() {
 
     private fun dispatchGestureAction(clicks: Int) {
         if (glyphReactionEnabled) {
-            GlyphController.pulse(Math.min(clicks, 3))
+            GlyphController.pulse(Math.min(clicks, 4))
         }
 
         if (hapticReactionEnabled) {
@@ -344,34 +405,91 @@ class VolumeTweakService : AccessibilityService() {
         val actionName = when (clicks) {
             1 -> action1Click
             2 -> action2Clicks
-            3, 4 -> action3Clicks
-            else -> action3Clicks
+            3 -> action3Clicks
+            4 -> action4Clicks
+            else -> action4Clicks
+        }
+
+        // If combo sequences are enabled and this was 1 click, wait for follow-up key
+        if (comboSequencesEnabled && clicks == 1) {
+            isAwaitingCombo = true
+            pendingComboFallbackAction = actionName
+            cancelAwaitingCombo()
+
+            val comboTimeout = Runnable {
+                isAwaitingCombo = false
+                executeConfiguredAction(pendingComboFallbackAction, 1)
+            }
+            pendingComboTimeoutRunnable = comboTimeout
+            handler.postDelayed(comboTimeout, COMBO_TIMEOUT_MS)
+            return
         }
 
         executeConfiguredAction(actionName, clicks)
     }
 
+    private fun cancelAwaitingCombo() {
+        pendingComboTimeoutRunnable?.let {
+            handler.removeCallbacks(it)
+            pendingComboTimeoutRunnable = null
+        }
+    }
+
     private fun executeConfiguredAction(action: String, clicks: Int) {
         when (action) {
             "PLAY_PAUSE" -> {
-                LogBuffer.log("[ACTION] $clicks Click(s): Play / Pause")
+                LogBuffer.log("[ACTION] $clicks Click: Play / Pause")
                 sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
             }
             "NEXT" -> {
-                LogBuffer.log("[ACTION] $clicks Click(s): Next Track")
+                LogBuffer.log("[ACTION] $clicks Click: Next Track")
                 sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_NEXT)
             }
             "PREV" -> {
-                LogBuffer.log("[ACTION] $clicks Click(s): Previous Track")
+                LogBuffer.log("[ACTION] $clicks Click: Previous Track")
                 sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
             }
+            "FAST_FORWARD" -> {
+                LogBuffer.log("[ACTION] $clicks Click: Fast Forward 15s")
+                sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)
+            }
+            "REWIND" -> {
+                LogBuffer.log("[ACTION] $clicks Click: Rewind 15s")
+                sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_REWIND)
+            }
             "MUTE" -> {
-                LogBuffer.log("[ACTION] $clicks Click(s): Toggle Mute")
+                LogBuffer.log("[ACTION] $clicks Click: Toggle Mute")
                 audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, AudioManager.FLAG_SHOW_UI)
             }
+            "VOL_MAX" -> {
+                LogBuffer.log("[ACTION] $clicks Click: Max Volume (100%)")
+                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVol, AudioManager.FLAG_SHOW_UI)
+            }
+            "VOL_MIN" -> {
+                LogBuffer.log("[ACTION] $clicks Click: Quiet Mode (10%)")
+                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val quietVol = (maxVol * 0.15f).toInt().coerceAtLeast(1)
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, quietVol, AudioManager.FLAG_SHOW_UI)
+            }
+            "FLASHLIGHT_TOGGLE" -> {
+                val isOn = GlyphController.toggleTorch()
+                LogBuffer.log("[ACTION] $clicks Click: Flashlight ${if (isOn) "ON" else "OFF"}")
+            }
             "FLASHLIGHT" -> {
-                LogBuffer.log("[ACTION] $clicks Click(s): Flashlight Pulse")
+                LogBuffer.log("[ACTION] $clicks Click: Flashlight Pulse")
                 GlyphController.pulse(2)
+            }
+            "VOICE_ASSISTANT" -> {
+                LogBuffer.log("[ACTION] $clicks Click: Voice Assistant")
+                try {
+                    val intent = Intent(Intent.ACTION_VOICE_COMMAND).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    LogBuffer.log("Voice Assistant unavailable: ${e.message}")
+                }
             }
             else -> {
                 sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
@@ -380,10 +498,19 @@ class VolumeTweakService : AccessibilityService() {
     }
 
     private fun sendMediaKeyEvent(keyCode: Int) {
-        val downEvent = KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_DOWN, keyCode, 0)
-        val upEvent = KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, keyCode, 0)
+        val now = SystemClock.uptimeMillis()
+        val downEvent = KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0)
+        val upEvent = KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0)
 
         audioManager.dispatchMediaKeyEvent(downEvent)
         audioManager.dispatchMediaKeyEvent(upEvent)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        sensorManager?.unregisterListener(this)
+        wakeLock?.let {
+            if (it.isHeld) it.release()
+        }
     }
 }
