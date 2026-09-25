@@ -1,11 +1,13 @@
 package com.dhruv.volumetweak
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -15,6 +17,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
@@ -23,14 +26,33 @@ import com.google.android.material.materialswitch.MaterialSwitch
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvStatus: TextView
+    private lateinit var tvAppVersion: TextView
+    private lateinit var btnCheckUpdates: View
+    private lateinit var tvUpdateStatus: TextView
     private lateinit var btnEnableService: MaterialButton
+
+    private lateinit var switchMasterKill: MaterialSwitch
+    private lateinit var tvMasterStatusTitle: TextView
+    private lateinit var tvMasterStatusSubtitle: TextView
+
     private lateinit var tvRamUsage: TextView
     private lateinit var tvCpuUsage: TextView
+
+    private lateinit var rowGesture1: View
+    private lateinit var tvAction1: TextView
+    private lateinit var rowGesture2: View
+    private lateinit var tvAction2: TextView
+    private lateinit var rowGesture3: View
+    private lateinit var tvAction3: TextView
+    private lateinit var rowSensitivity: View
+    private lateinit var tvSensitivity: TextView
+
     private lateinit var switchHaptic: MaterialSwitch
     private lateinit var switchGlyph: MaterialSwitch
     private lateinit var switchTestMode: MaterialSwitch
     private lateinit var layoutWhitelistSelector: View
     private lateinit var tvWhitelistSummary: TextView
+
     private lateinit var tvLogs: TextView
     private lateinit var scrollLogs: ScrollView
     private lateinit var btnClearLogs: ImageView
@@ -38,6 +60,7 @@ class MainActivity : AppCompatActivity() {
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
+    private var currentVersionName: String = "1.6"
 
     data class AppItem(val label: String, val packageName: String)
 
@@ -45,46 +68,140 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Bind Views
         tvStatus = findViewById(R.id.tvStatus)
-        val tvAppVersion: TextView = findViewById(R.id.tvAppVersion)
-        try {
-            val pInfo = packageManager.getPackageInfo(packageName, 0)
-            val vName = pInfo.versionName
-            val vCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                pInfo.longVersionCode
-            } else {
-                @Suppress("DEPRECATION") pInfo.versionCode.toLong()
-            }
-            tvAppVersion.text = "v$vName (Build $vCode)"
-        } catch (e: Exception) {
-            tvAppVersion.text = "v1.5 (Build 6)"
-        }
+        tvAppVersion = findViewById(R.id.tvAppVersion)
+        btnCheckUpdates = findViewById(R.id.btnCheckUpdates)
+        tvUpdateStatus = findViewById(R.id.tvUpdateStatus)
         btnEnableService = findViewById(R.id.btnEnableService)
+
+        switchMasterKill = findViewById(R.id.switchMasterKill)
+        tvMasterStatusTitle = findViewById(R.id.tvMasterStatusTitle)
+        tvMasterStatusSubtitle = findViewById(R.id.tvMasterStatusSubtitle)
+
         tvRamUsage = findViewById(R.id.tvRamUsage)
         tvCpuUsage = findViewById(R.id.tvCpuUsage)
+
+        rowGesture1 = findViewById(R.id.rowGesture1)
+        tvAction1 = findViewById(R.id.tvAction1)
+        rowGesture2 = findViewById(R.id.rowGesture2)
+        tvAction2 = findViewById(R.id.tvAction2)
+        rowGesture3 = findViewById(R.id.rowGesture3)
+        tvAction3 = findViewById(R.id.tvAction3)
+        rowSensitivity = findViewById(R.id.rowSensitivity)
+        tvSensitivity = findViewById(R.id.tvSensitivity)
+
         switchHaptic = findViewById(R.id.switchHaptic)
         switchGlyph = findViewById(R.id.switchGlyph)
         switchTestMode = findViewById(R.id.switchTestMode)
         layoutWhitelistSelector = findViewById(R.id.layoutWhitelistSelector)
         tvWhitelistSummary = findViewById(R.id.tvWhitelistSummary)
+
         tvLogs = findViewById(R.id.tvLogs)
         scrollLogs = findViewById(R.id.scrollLogs)
         btnClearLogs = findViewById(R.id.btnClearLogs)
         btnCopyLogs = findViewById(R.id.btnCopyLogs)
 
-        btnCopyLogs.setOnClickListener {
-            val text = LogBuffer.getAllLogsText()
-            if (text.isNotBlank()) {
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                val clip = android.content.ClipData.newPlainText("VolumeTweakLogs", text)
-                clipboard.setPrimaryClip(clip)
-                android.widget.Toast.makeText(this, "Logs copied to clipboard", android.widget.Toast.LENGTH_SHORT).show()
+        val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+
+        // Dynamic Version Display
+        try {
+            val pInfo = packageManager.getPackageInfo(packageName, 0)
+            currentVersionName = pInfo.versionName ?: "1.6"
+            val vCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                pInfo.longVersionCode
             } else {
-                android.widget.Toast.makeText(this, "No logs to copy", android.widget.Toast.LENGTH_SHORT).show()
+                @Suppress("DEPRECATION") pInfo.versionCode.toLong()
+            }
+            tvAppVersion.text = "v$currentVersionName (Build $vCode)"
+        } catch (e: Exception) {
+            tvAppVersion.text = "v1.6 (Build 7)"
+        }
+
+        // Check for Updates
+        btnCheckUpdates.setOnClickListener {
+            tvUpdateStatus.text = "Checking..."
+            UpdateChecker.checkForUpdate(currentVersionName) { result ->
+                if (result.hasUpdate) {
+                    tvUpdateStatus.text = "Update!"
+                    showUpdateAvailableDialog(result)
+                } else {
+                    tvUpdateStatus.text = "Up to date"
+                    val msg = if (result.errorMessage != null) {
+                        "Checked: ${result.errorMessage}"
+                    } else {
+                        "You are on the latest version (${result.latestVersion})"
+                    }
+                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
-        val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+        // Master Kill Switch
+        val isSuspended = prefs.getBoolean("master_service_suspended", false)
+        switchMasterKill.isChecked = !isSuspended
+        VolumeTweakService.isServiceSuspended = isSuspended
+        updateMasterStatusUI(!isSuspended)
+
+        switchMasterKill.setOnCheckedChangeListener { _, isActive ->
+            val suspended = !isActive
+            prefs.edit().putBoolean("master_service_suspended", suspended).apply()
+            VolumeTweakService.isServiceSuspended = suspended
+            updateMasterStatusUI(isActive)
+            LogBuffer.log("[MASTER] Service ${if (isActive) "ACTIVATED" else "SUSPENDED (Pass-through mode)"}")
+        }
+
+        // Gesture Action 1 Customizer
+        val action1 = prefs.getString("action_1_click", "PLAY_PAUSE") ?: "PLAY_PAUSE"
+        VolumeTweakService.action1Click = action1
+        tvAction1.text = formatActionLabel(action1)
+        rowGesture1.setOnClickListener {
+            showActionPicker("1 Click Action", listOf("PLAY_PAUSE", "NEXT", "PREV", "MUTE", "FLASHLIGHT"), action1) { selected ->
+                prefs.edit().putString("action_1_click", selected).apply()
+                VolumeTweakService.action1Click = selected
+                tvAction1.text = formatActionLabel(selected)
+                LogBuffer.log("Config: 1 Click -> $selected")
+            }
+        }
+
+        // Gesture Action 2 Customizer
+        val action2 = prefs.getString("action_2_clicks", "NEXT") ?: "NEXT"
+        VolumeTweakService.action2Clicks = action2
+        tvAction2.text = formatActionLabel(action2)
+        rowGesture2.setOnClickListener {
+            showActionPicker("2 Clicks Action", listOf("NEXT", "PLAY_PAUSE", "PREV"), action2) { selected ->
+                prefs.edit().putString("action_2_clicks", selected).apply()
+                VolumeTweakService.action2Clicks = selected
+                tvAction2.text = formatActionLabel(selected)
+                LogBuffer.log("Config: 2 Clicks -> $selected")
+            }
+        }
+
+        // Gesture Action 3 Customizer
+        val action3 = prefs.getString("action_3_clicks", "PREV") ?: "PREV"
+        VolumeTweakService.action3Clicks = action3
+        tvAction3.text = formatActionLabel(action3)
+        rowGesture3.setOnClickListener {
+            showActionPicker("3 Clicks Action", listOf("PREV", "NEXT", "PLAY_PAUSE"), action3) { selected ->
+                prefs.edit().putString("action_3_clicks", selected).apply()
+                VolumeTweakService.action3Clicks = selected
+                tvAction3.text = formatActionLabel(selected)
+                LogBuffer.log("Config: 3 Clicks -> $selected")
+            }
+        }
+
+        // Sensitivity (Dual-Press Window) Customizer
+        val windowMs = prefs.getLong("dual_press_window_ms", 140L)
+        VolumeTweakService.dualPressWindowMs = windowMs
+        tvSensitivity.text = formatSensitivityLabel(windowMs)
+        rowSensitivity.setOnClickListener {
+            showSensitivityPicker(windowMs) { selectedMs ->
+                prefs.edit().putLong("dual_press_window_ms", selectedMs).apply()
+                VolumeTweakService.dualPressWindowMs = selectedMs
+                tvSensitivity.text = formatSensitivityLabel(selectedMs)
+                LogBuffer.log("Config: Window -> ${selectedMs}ms")
+            }
+        }
 
         // Haptic Feedback Switch
         val isHaptic = prefs.getBoolean("haptic_feedback", true)
@@ -96,7 +213,7 @@ class MainActivity : AppCompatActivity() {
             if (isChecked) {
                 HapticFeedbackController.vibrate(this, 1)
             }
-            LogBuffer.log("Haptic feedback: ${if (isChecked) "ENABLED (tested 1 pulse)" else "DISABLED"}")
+            LogBuffer.log("Haptic feedback: ${if (isChecked) "ENABLED" else "DISABLED"}")
         }
 
         // Test Mode Switch
@@ -106,7 +223,7 @@ class MainActivity : AppCompatActivity() {
         switchTestMode.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("test_mode", isChecked).apply()
             VolumeTweakService.testModeEnabled = isChecked
-            LogBuffer.log("Test mode: ${if (isChecked) "ON (Bypass active)" else "OFF (Music required)"}")
+            LogBuffer.log("Test mode: ${if (isChecked) "ON (Music bypass active)" else "OFF (Music required)"}")
         }
 
         // Glyph Switch
@@ -136,6 +253,90 @@ class MainActivity : AppCompatActivity() {
         btnClearLogs.setOnClickListener {
             LogBuffer.clear()
         }
+
+        btnCopyLogs.setOnClickListener {
+            val text = LogBuffer.getAllLogsText()
+            if (text.isNotBlank()) {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("VolumeTweakLogs", text)
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this, "Logs copied to clipboard", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "No logs to copy", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun updateMasterStatusUI(isActive: Boolean) {
+        if (isActive) {
+            tvMasterStatusTitle.text = "Service Status: ACTIVE"
+            tvMasterStatusTitle.setTextColor(Color.WHITE)
+            tvMasterStatusSubtitle.text = "Intercepting volume button gestures"
+        } else {
+            tvMasterStatusTitle.text = "Service Status: SUSPENDED"
+            tvMasterStatusTitle.setTextColor(Color.parseColor("#E50914"))
+            tvMasterStatusSubtitle.text = "Volume buttons 100% normal (tweak sleeping)"
+        }
+    }
+
+    private fun formatActionLabel(action: String): String {
+        return when (action) {
+            "PLAY_PAUSE" -> "Play / Pause"
+            "NEXT" -> "Next Track"
+            "PREV" -> "Previous Track"
+            "MUTE" -> "Toggle Mute"
+            "FLASHLIGHT" -> "Flashlight Pulse"
+            else -> action
+        }
+    }
+
+    private fun formatSensitivityLabel(ms: Long): String {
+        return when (ms) {
+            100L -> "Tight (100ms)"
+            140L -> "Balanced (140ms)"
+            180L -> "Relaxed (180ms)"
+            else -> "${ms}ms"
+        }
+    }
+
+    private fun showActionPicker(title: String, options: List<String>, current: String, onSelect: (String) -> Unit) {
+        val labels = options.map { formatActionLabel(it) }.toTypedArray()
+        val currentIndex = options.indexOf(current).coerceAtLeast(0)
+
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
+                onSelect(options[which])
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showSensitivityPicker(currentMs: Long, onSelect: (Long) -> Unit) {
+        val options = listOf(100L, 140L, 180L)
+        val labels = options.map { formatSensitivityLabel(it) }.toTypedArray()
+        val currentIndex = options.indexOf(currentMs).coerceAtLeast(1)
+
+        AlertDialog.Builder(this)
+            .setTitle("Dual-Press Sensitivity Window")
+            .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
+                onSelect(options[which])
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showUpdateAvailableDialog(result: UpdateChecker.CheckResult) {
+        AlertDialog.Builder(this)
+            .setTitle("New Update: ${result.latestVersion}")
+            .setMessage("A new version is available on GitHub!\n\nRelease info:\n${result.releaseNotes ?: "Bug fixes and performance improvements."}")
+            .setPositiveButton("Download & Install") { _, _ ->
+                UpdateChecker.openDownloadUrl(this, result.downloadUrl)
+            }
+            .setNegativeButton("Later", null)
+            .show()
     }
 
     private fun updateWhitelistSummaryUI(packages: Set<String>) {
@@ -174,7 +375,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Sort alphabetically
         appList.sortBy { it.label.lowercase() }
 
         val appNames = appList.map { it.label }.toTypedArray()
@@ -198,7 +398,7 @@ class MainActivity : AppCompatActivity() {
                 prefs.edit().putStringSet("whitelist_packages", currentSelected).apply()
                 VolumeTweakService.targetAppPackages = currentSelected
                 updateWhitelistSummaryUI(currentSelected)
-                LogBuffer.log("Whitelist updated: ${currentSelected.size} apps selected")
+                LogBuffer.log("Whitelist: ${currentSelected.size} apps selected")
             }
             .setNeutralButton("Clear (All Apps)") { _, _ ->
                 val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
@@ -257,11 +457,11 @@ class MainActivity : AppCompatActivity() {
         if (isEnabled) {
             tvStatus.text = "ACTIVE"
             tvStatus.setTextColor(Color.parseColor("#4CAF50"))
-            btnEnableService.text = "Accessibility Active"
-            btnEnableService.isEnabled = true
+            btnEnableService.visibility = View.GONE
         } else {
             tvStatus.text = "DISABLED"
             tvStatus.setTextColor(Color.parseColor("#E50914"))
+            btnEnableService.visibility = View.VISIBLE
             btnEnableService.text = "Enable Accessibility Service"
             btnEnableService.isEnabled = true
         }

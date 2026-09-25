@@ -29,6 +29,7 @@ class VolumeTweakService : AccessibilityService() {
     private var isDualPressConsumed = false
 
     private var pendingSinglePressRunnable: Runnable? = null
+    private var continuousRampRunnable: Runnable? = null
     private var pendingSinglePressKeyCode: Int = 0
 
     private var clickCount = 0
@@ -41,15 +42,23 @@ class VolumeTweakService : AccessibilityService() {
     private var detectedPlayingPackage: String? = null
 
     companion object {
+        var isServiceSuspended: Boolean = false
         var testModeEnabled: Boolean = false
         var glyphReactionEnabled: Boolean = false
         var hapticReactionEnabled: Boolean = true
         var targetAppPackages: Set<String> = emptySet()
 
-        private const val DUAL_PRESS_WINDOW_MS = 140L  // Window for simultaneous press
-        private const val DEFER_SINGLE_PRESS_MS = 85L  // Deferral for initial key
+        // Configurable Gestures
+        var action1Click: String = "PLAY_PAUSE" // "PLAY_PAUSE", "NEXT", "PREV", "MUTE", "FLASHLIGHT"
+        var action2Clicks: String = "NEXT"      // "NEXT", "PLAY_PAUSE", "PREV"
+        var action3Clicks: String = "PREV"      // "PREV", "NEXT", "PLAY_PAUSE"
+
+        // Configurable Timings
+        var dualPressWindowMs: Long = 140L      // 100ms, 140ms, 180ms
+        var pauseSessionTimeoutMs: Long = 30000L // 15s, 30s, 60s
+        private const val DEFER_SINGLE_PRESS_MS = 80L  // Deferral for initial key
         private const val GESTURE_TIMEOUT_MS = 360L    // Multi-click accumulation window
-        private const val PAUSE_SESSION_TIMEOUT_MS = 20000L // 20s session retention for resume
+        private const val CONTINUOUS_RAMP_INTERVAL_MS = 110L // Stock Android volume hold repeat rate
     }
 
     override fun onCreate() {
@@ -135,6 +144,11 @@ class VolumeTweakService : AccessibilityService() {
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        // Master Kill Switch: If suspended, pass all keys through with 0 overhead
+        if (isServiceSuspended) {
+            return false
+        }
+
         val keyCode = event.keyCode
         val action = event.action
 
@@ -142,35 +156,24 @@ class VolumeTweakService : AccessibilityService() {
             return super.onKeyEvent(event)
         }
 
-        // When user holds down a volume button, repeatCount > 0
-        // Instantly bypass interception and let the OS handle continuous volume ramping
-        if (event.repeatCount > 0) {
-            cancelPendingSinglePress()
-            isVolUpPressed = false
-            isVolDownPressed = false
-            isDualPressConsumed = false
-            return false
-        }
-
         val currentTime = SystemClock.uptimeMillis()
         val isMusicActive = audioManager.isMusicActive
         val timeSinceLastAction = currentTime - lastTweakActionTime
-        val isRecentPauseSession = timeSinceLastAction < PAUSE_SESSION_TIMEOUT_MS
+        val isRecentPauseSession = timeSinceLastAction < pauseSessionTimeoutMs
         val isEligibleMediaState = isMusicActive || isRecentPauseSession || testModeEnabled
 
         // Verify Whitelist against detected playing app or fallback
         val passesWhitelist = isAppWhitelisted()
-
         val isEnabledForAction = isEligibleMediaState && passesWhitelist
 
         val keyName = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) "Vol UP" else "Vol DOWN"
         val actionName = if (action == KeyEvent.ACTION_DOWN) "DOWN" else "UP"
 
         if (!isEnabledForAction) {
-            if (action == KeyEvent.ACTION_DOWN) {
+            if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                 val reason = when {
-                    !isEligibleMediaState -> "Audio not active (isMusicActive=false, recent=${isRecentPauseSession})"
-                    !passesWhitelist -> "Playing app '${detectedPlayingPackage ?: "unknown"}' not in whitelist (${targetAppPackages.size} apps allowed)"
+                    !isEligibleMediaState -> "Audio inactive"
+                    !passesWhitelist -> "App not whitelisted"
                     else -> "Bypassed"
                 }
                 LogBuffer.log("[BYPASS] $keyName $actionName ($reason)")
@@ -178,6 +181,7 @@ class VolumeTweakService : AccessibilityService() {
             isVolUpPressed = false
             isVolDownPressed = false
             isDualPressConsumed = false
+            cancelContinuousVolumeRamp()
             return false
         }
 
@@ -196,11 +200,17 @@ class VolumeTweakService : AccessibilityService() {
             val timeDiff = Math.abs(lastVolUpTime - lastVolDownTime)
 
             // Simultaneous dual-press detection
-            if (isVolUpPressed && isVolDownPressed && timeDiff <= DUAL_PRESS_WINDOW_MS) {
+            if (isVolUpPressed && isVolDownPressed && timeDiff <= dualPressWindowMs) {
                 isDualPressConsumed = true
-                LogBuffer.log("[DUAL PRESS] Detected (diff: ${timeDiff}ms, app: ${detectedPlayingPackage ?: "Media"})")
+                LogBuffer.log("[DUAL PRESS] Detected (diff: ${timeDiff}ms)")
                 cancelPendingSinglePress()
+                cancelContinuousVolumeRamp()
                 registerDualClick()
+                return true
+            }
+
+            // If user is already holding a button for continuous volume adjustment, don't restart deferral
+            if (continuousRampRunnable != null) {
                 return true
             }
 
@@ -215,6 +225,10 @@ class VolumeTweakService : AccessibilityService() {
             } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
                 isVolDownPressed = false
             }
+
+            // Cancel any continuous ramping immediately when key is released
+            cancelContinuousVolumeRamp()
+            cancelPendingSinglePress()
 
             // Only consume UP if it belonged to an intercepted dual press
             if (isDualPressConsumed) {
@@ -239,18 +253,49 @@ class VolumeTweakService : AccessibilityService() {
             return targetAppPackages.contains(pkg)
         }
 
-        // Fallback: If detectedPlayingPackage is temporarily null but music is active, allow or match
+        // Fallback: If detectedPlayingPackage is temporarily null but music is active, allow
         return true
     }
 
     private fun scheduleDeferredSinglePress(keyCode: Int) {
         pendingSinglePressKeyCode = keyCode
         val runnable = Runnable {
+            // First single volume step
             adjustVolume(keyCode)
             pendingSinglePressRunnable = null
+
+            // Start continuous ramping if the button is still being held down!
+            val isStillPressed = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolUpPressed else isVolDownPressed
+            if (isStillPressed && !isDualPressConsumed) {
+                startContinuousVolumeRamp(keyCode)
+            }
         }
         pendingSinglePressRunnable = runnable
         handler.postDelayed(runnable, DEFER_SINGLE_PRESS_MS)
+    }
+
+    private fun startContinuousVolumeRamp(keyCode: Int) {
+        cancelContinuousVolumeRamp()
+        val direction = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+        continuousRampRunnable = object : Runnable {
+            override fun run() {
+                val isStillPressed = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolUpPressed else isVolDownPressed
+                if (isStillPressed && !isDualPressConsumed) {
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
+                    handler.postDelayed(this, CONTINUOUS_RAMP_INTERVAL_MS)
+                } else {
+                    cancelContinuousVolumeRamp()
+                }
+            }
+        }
+        handler.postDelayed(continuousRampRunnable!!, CONTINUOUS_RAMP_INTERVAL_MS)
+    }
+
+    private fun cancelContinuousVolumeRamp() {
+        continuousRampRunnable?.let {
+            handler.removeCallbacks(it)
+            continuousRampRunnable = null
+        }
     }
 
     private fun cancelPendingSinglePress() {
@@ -296,24 +341,40 @@ class VolumeTweakService : AccessibilityService() {
             HapticFeedbackController.vibrate(this, clicks)
         }
 
-        when (clicks) {
-            1 -> {
-                LogBuffer.log("[ACTION] 1 Click: Play / Pause")
+        val actionName = when (clicks) {
+            1 -> action1Click
+            2 -> action2Clicks
+            3, 4 -> action3Clicks
+            else -> action3Clicks
+        }
+
+        executeConfiguredAction(actionName, clicks)
+    }
+
+    private fun executeConfiguredAction(action: String, clicks: Int) {
+        when (action) {
+            "PLAY_PAUSE" -> {
+                LogBuffer.log("[ACTION] $clicks Click(s): Play / Pause")
                 sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
             }
-            2 -> {
-                LogBuffer.log("[ACTION] 2 Clicks: Next Track")
+            "NEXT" -> {
+                LogBuffer.log("[ACTION] $clicks Click(s): Next Track")
                 sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_NEXT)
             }
-            3, 4 -> {
-                LogBuffer.log("[ACTION] $clicks Clicks: Previous Track")
+            "PREV" -> {
+                LogBuffer.log("[ACTION] $clicks Click(s): Previous Track")
                 sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
             }
+            "MUTE" -> {
+                LogBuffer.log("[ACTION] $clicks Click(s): Toggle Mute")
+                audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, AudioManager.FLAG_SHOW_UI)
+            }
+            "FLASHLIGHT" -> {
+                LogBuffer.log("[ACTION] $clicks Click(s): Flashlight Pulse")
+                GlyphController.pulse(2)
+            }
             else -> {
-                if (clicks > 4) {
-                    LogBuffer.log("[ACTION] $clicks Clicks: Previous Track")
-                    sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-                }
+                sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
             }
         }
     }
