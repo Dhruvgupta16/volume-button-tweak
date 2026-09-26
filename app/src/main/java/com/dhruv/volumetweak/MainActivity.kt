@@ -11,14 +11,19 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.text.TextUtils
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -43,12 +48,16 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var rowGesture1: View
     private lateinit var tvAction1: TextView
+    private lateinit var imgActionIcon1: ImageView
     private lateinit var rowGesture2: View
     private lateinit var tvAction2: TextView
+    private lateinit var imgActionIcon2: ImageView
     private lateinit var rowGesture3: View
     private lateinit var tvAction3: TextView
+    private lateinit var imgActionIcon3: ImageView
     private lateinit var rowGesture4: View
     private lateinit var tvAction4: TextView
+    private lateinit var imgActionIcon4: ImageView
     private lateinit var rowSensitivity: View
     private lateinit var tvSensitivity: TextView
 
@@ -71,7 +80,7 @@ class MainActivity : AppCompatActivity() {
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
-    private var currentVersionName = "1.9.5"
+    private var currentVersionName = "1.9.6"
 
     private val customCombosList = mutableListOf<CustomCombo>()
 
@@ -97,12 +106,16 @@ class MainActivity : AppCompatActivity() {
 
         rowGesture1 = findViewById(R.id.rowGesture1)
         tvAction1 = findViewById(R.id.tvAction1)
+        imgActionIcon1 = findViewById(R.id.imgActionIcon1)
         rowGesture2 = findViewById(R.id.rowGesture2)
         tvAction2 = findViewById(R.id.tvAction2)
+        imgActionIcon2 = findViewById(R.id.imgActionIcon2)
         rowGesture3 = findViewById(R.id.rowGesture3)
         tvAction3 = findViewById(R.id.tvAction3)
+        imgActionIcon3 = findViewById(R.id.imgActionIcon3)
         rowGesture4 = findViewById(R.id.rowGesture4)
         tvAction4 = findViewById(R.id.tvAction4)
+        imgActionIcon4 = findViewById(R.id.imgActionIcon4)
         rowSensitivity = findViewById(R.id.rowSensitivity)
         tvSensitivity = findViewById(R.id.tvSensitivity)
 
@@ -175,58 +188,58 @@ class MainActivity : AppCompatActivity() {
         // Standard Dual-Press Gestures
         val action1 = prefs.getString("action_1_click", "PLAY_PAUSE") ?: "PLAY_PAUSE"
         VolumeTweakService.action1Click = action1
-        tvAction1.text = ActionRegistry.getTitle(action1)
+        updateGestureRowUI(1, action1)
         rowGesture1.setOnClickListener {
-            showActionPicker("1 Click Action", action1) { selected ->
+            handleActionSelection("1 Click Action", VolumeTweakService.action1Click) { selected ->
                 prefs.edit().putString("action_1_click", selected).apply()
                 VolumeTweakService.action1Click = selected
-                tvAction1.text = ActionRegistry.getTitle(selected)
+                updateGestureRowUI(1, selected)
                 LogBuffer.log("Config: 1 Click -> $selected")
             }
         }
 
         val action2 = prefs.getString("action_2_clicks", "NEXT") ?: "NEXT"
         VolumeTweakService.action2Clicks = action2
-        tvAction2.text = ActionRegistry.getTitle(action2)
+        updateGestureRowUI(2, action2)
         rowGesture2.setOnClickListener {
-            showActionPicker("2 Clicks Action", action2) { selected ->
+            handleActionSelection("2 Clicks Action", VolumeTweakService.action2Clicks) { selected ->
                 prefs.edit().putString("action_2_clicks", selected).apply()
                 VolumeTweakService.action2Clicks = selected
-                tvAction2.text = ActionRegistry.getTitle(selected)
+                updateGestureRowUI(2, selected)
                 LogBuffer.log("Config: 2 Clicks -> $selected")
             }
         }
 
         val action3 = prefs.getString("action_3_clicks", "PREV") ?: "PREV"
         VolumeTweakService.action3Clicks = action3
-        tvAction3.text = ActionRegistry.getTitle(action3)
+        updateGestureRowUI(3, action3)
         rowGesture3.setOnClickListener {
-            showActionPicker("3 Clicks Action", action3) { selected ->
+            handleActionSelection("3 Clicks Action", VolumeTweakService.action3Clicks) { selected ->
                 prefs.edit().putString("action_3_clicks", selected).apply()
                 VolumeTweakService.action3Clicks = selected
-                tvAction3.text = ActionRegistry.getTitle(selected)
+                updateGestureRowUI(3, selected)
                 LogBuffer.log("Config: 3 Clicks -> $selected")
             }
         }
 
         val action4 = prefs.getString("action_4_clicks", "SKIP_FWD_15") ?: "SKIP_FWD_15"
         VolumeTweakService.action4Clicks = action4
-        tvAction4.text = ActionRegistry.getTitle(action4)
+        updateGestureRowUI(4, action4)
         rowGesture4.setOnClickListener {
-            showActionPicker("4 Clicks Action", action4) { selected ->
+            handleActionSelection("4 Clicks Action", VolumeTweakService.action4Clicks) { selected ->
                 prefs.edit().putString("action_4_clicks", selected).apply()
                 VolumeTweakService.action4Clicks = selected
-                tvAction4.text = ActionRegistry.getTitle(selected)
+                updateGestureRowUI(4, selected)
                 LogBuffer.log("Config: 4 Clicks -> $selected")
             }
         }
 
-        // Sensitivity (Dual-Press Window) Customizer
+        // Sensitivity (Dual-Press Window) Customizer with Live Test Pad
         val windowMs = prefs.getLong("dual_press_window", 140L)
         VolumeTweakService.dualPressWindowMs = windowMs
         tvSensitivity.text = formatSensitivityLabel(windowMs)
         rowSensitivity.setOnClickListener {
-            showSensitivityPicker(windowMs) { selectedMs ->
+            showSensitivityDialog(VolumeTweakService.dualPressWindowMs) { selectedMs ->
                 prefs.edit().putLong("dual_press_window", selectedMs).apply()
                 VolumeTweakService.dualPressWindowMs = selectedMs
                 tvSensitivity.text = formatSensitivityLabel(selectedMs)
@@ -352,12 +365,14 @@ class MainActivity : AppCompatActivity() {
 
             val tvSequence = itemView.findViewById<TextView>(R.id.tvComboSequence)
             val tvAction = itemView.findViewById<TextView>(R.id.tvComboAction)
+            val imgIcon = itemView.findViewById<ImageView>(R.id.imgComboIcon)
             val switchItem = itemView.findViewById<MaterialSwitch>(R.id.switchComboItem)
             val btnDelete = itemView.findViewById<ImageView>(R.id.btnDeleteCombo)
             val layoutRow = itemView.findViewById<View>(R.id.layoutComboRow)
 
             tvSequence.text = combo.getDisplaySequence()
             tvAction.text = ActionRegistry.getTitle(combo.action)
+            imgIcon.setImageResource(ActionRegistry.getIcon(combo.action))
             switchItem.isChecked = combo.isEnabled
 
             switchItem.setOnCheckedChangeListener { _, isChecked ->
@@ -366,9 +381,10 @@ class MainActivity : AppCompatActivity() {
             }
 
             layoutRow.setOnClickListener {
-                showActionPicker("Select Action for ${combo.getDisplaySequence()}", combo.action) { newAction ->
+                handleActionSelection("Action for ${combo.getDisplaySequence()}", combo.action) { newAction ->
                     combo.action = newAction
                     tvAction.text = ActionRegistry.getTitle(newAction)
+                    imgIcon.setImageResource(ActionRegistry.getIcon(newAction))
                     saveCustomCombosToPrefs()
                 }
             }
@@ -401,10 +417,11 @@ class MainActivity : AppCompatActivity() {
     private fun showSequenceBuilderDialog() {
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_sequence_builder, null)
         val builderTokens = mutableListOf("DUAL")
-        var chosenAction = "SKIP_FWD_15"
+        var chosenAction = "SKIP_FORWARD:15"
 
         val tvDisplay = dialogView.findViewById<TextView>(R.id.tvBuilderSequenceDisplay)
         val tvActionTitle = dialogView.findViewById<TextView>(R.id.tvBuilderActionTitle)
+        val imgActionIcon = dialogView.findViewById<ImageView>(R.id.imgBuilderActionIcon)
         val rowSelectAction = dialogView.findViewById<View>(R.id.rowBuilderSelectAction)
 
         val btnDual = dialogView.findViewById<MaterialButton>(R.id.btnTokenDual)
@@ -428,6 +445,7 @@ class MainActivity : AppCompatActivity() {
                 tvDisplay.setTextColor(Color.WHITE)
             }
             tvActionTitle.text = ActionRegistry.getTitle(chosenAction)
+            imgActionIcon.setImageResource(ActionRegistry.getIcon(chosenAction))
         }
 
         updateUI()
@@ -452,7 +470,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         rowSelectAction.setOnClickListener {
-            showActionPicker("Select Sequence Action", chosenAction) { selected ->
+            handleActionSelection("Select Sequence Action", chosenAction) { selected ->
                 chosenAction = selected
                 updateUI()
             }
@@ -499,42 +517,368 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun formatSensitivityLabel(ms: Long): String {
-        return when (ms) {
-            100L -> "Tight (100ms)"
-            140L -> "Balanced (140ms)"
-            180L -> "Relaxed (180ms)"
-            else -> "${ms}ms"
+        val desc = when {
+            ms <= 110L -> "Tight"
+            ms <= 155L -> "Balanced"
+            ms <= 210L -> "Relaxed"
+            else -> "Forgiving"
+        }
+        return "$desc (${ms}ms)"
+    }
+
+    private fun updateGestureRowUI(index: Int, actionId: String) {
+        val title = ActionRegistry.getTitle(actionId)
+        val iconRes = ActionRegistry.getIcon(actionId)
+        when (index) {
+            1 -> {
+                tvAction1.text = title
+                imgActionIcon1.setImageResource(iconRes)
+            }
+            2 -> {
+                tvAction2.text = title
+                imgActionIcon2.setImageResource(iconRes)
+            }
+            3 -> {
+                tvAction3.text = title
+                imgActionIcon3.setImageResource(iconRes)
+            }
+            4 -> {
+                tvAction4.text = title
+                imgActionIcon4.setImageResource(iconRes)
+            }
+        }
+    }
+
+    private fun handleActionSelection(title: String, currentAction: String, onFinalAction: (String) -> Unit) {
+        showActionPicker(title, currentAction) { chosenActionId ->
+            val actionDef = ActionRegistry.getAction(chosenActionId)
+            if (actionDef != null && actionDef.parameterType != ParameterType.NONE) {
+                showParameterDialog(chosenActionId, currentAction, onFinalAction)
+            } else {
+                onFinalAction(chosenActionId)
+            }
         }
     }
 
     private fun showActionPicker(title: String, currentActionId: String, onSelect: (String) -> Unit) {
         val actions = ActionRegistry.ALL_ACTIONS
-        val labels = actions.map { "${it.title}  •  ${it.category}" }.toTypedArray()
-        val currentIndex = actions.indexOfFirst { it.id == currentActionId }.coerceAtLeast(0)
+        val baseCurrent = ActionRegistry.getBaseId(currentActionId)
 
-        AlertDialog.Builder(this)
+        val adapter = object : ArrayAdapter<TweakAction>(this, 0, actions) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = convertView ?: LayoutInflater.from(context).inflate(R.layout.item_action_picker, parent, false)
+                val item = getItem(position)!!
+                val img = view.findViewById<ImageView>(R.id.imgPickerIcon)
+                val tvTitle = view.findViewById<TextView>(R.id.tvPickerTitle)
+                val tvDesc = view.findViewById<TextView>(R.id.tvPickerDesc)
+
+                img.setImageResource(item.iconRes)
+                tvTitle.text = item.title
+                tvDesc.text = item.description
+
+                if (item.id == baseCurrent) {
+                    tvTitle.setTextColor(Color.parseColor("#D71921"))
+                } else {
+                    tvTitle.setTextColor(Color.WHITE)
+                }
+
+                return view
+            }
+        }
+
+        var dialog: AlertDialog? = null
+        dialog = AlertDialog.Builder(this)
             .setTitle(title)
-            .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
+            .setAdapter(adapter) { _, which ->
                 onSelect(actions[which].id)
-                dialog.dismiss()
+                dialog?.dismiss()
             }
             .setNegativeButton("Cancel", null)
-            .show()
+            .create()
+
+        dialog.show()
     }
 
-    private fun showSensitivityPicker(currentMs: Long, onSelect: (Long) -> Unit) {
-        val options = listOf(100L, 140L, 180L)
-        val labels = options.map { formatSensitivityLabel(it) }.toTypedArray()
-        val currentIndex = options.indexOf(currentMs).coerceAtLeast(1)
+    private fun showParameterDialog(chosenActionId: String, currentActionStr: String, onComplete: (String) -> Unit) {
+        val baseId = ActionRegistry.getBaseId(chosenActionId)
+        val actionDef = ActionRegistry.getAction(baseId) ?: return onComplete(chosenActionId)
+        val currentParam = ActionRegistry.getParam(currentActionStr) ?: actionDef.defaultParam
 
-        AlertDialog.Builder(this)
-            .setTitle("Dual-Press Sensitivity Window")
-            .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
-                onSelect(options[which])
-                dialog.dismiss()
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_action_parameter, null)
+        val imgIcon = dialogView.findViewById<ImageView>(R.id.imgParamActionIcon)
+        val tvTitle = dialogView.findViewById<TextView>(R.id.tvParamDialogTitle)
+        val tvSubtitle = dialogView.findViewById<TextView>(R.id.tvParamDialogSubtitle)
+        val tvValueDisplay = dialogView.findViewById<TextView>(R.id.tvParamValueDisplay)
+        val seekParam = dialogView.findViewById<SeekBar>(R.id.seekParam)
+        val tvMin = dialogView.findViewById<TextView>(R.id.tvParamMin)
+        val tvMax = dialogView.findViewById<TextView>(R.id.tvParamMax)
+        val containerChips = dialogView.findViewById<LinearLayout>(R.id.containerParamChips)
+        val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnParamCancel)
+        val btnSave = dialogView.findViewById<MaterialButton>(R.id.btnParamSave)
+
+        imgIcon.setImageResource(actionDef.iconRes)
+        tvTitle.text = actionDef.title.uppercase()
+
+        var selectedParamValue = currentParam
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        when (actionDef.parameterType) {
+            ParameterType.SECONDS -> {
+                tvSubtitle.text = "Set how many seconds to skip on each trigger."
+                tvMin.text = "5s"
+                tvMax.text = "120s"
+                seekParam.max = 115
+                seekParam.progress = (selectedParamValue - 5).coerceIn(0, 115)
+
+                fun updateSec(sec: Int) {
+                    selectedParamValue = sec
+                    tvValueDisplay.text = "$sec seconds"
+                }
+                updateSec(selectedParamValue)
+
+                seekParam.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                        if (fromUser) updateSec(p + 5)
+                    }
+                    override fun onStartTrackingTouch(s: SeekBar?) {}
+                    override fun onStopTrackingTouch(s: SeekBar?) {}
+                })
+
+                val presets = listOf(5, 10, 15, 30, 45, 60)
+                for (p in presets) {
+                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                        text = "${p}s"
+                        textSize = 11f
+                        setTextColor(Color.WHITE)
+                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                            marginEnd = 4
+                        }
+                        setOnClickListener {
+                            seekParam.progress = (p - 5).coerceIn(0, 115)
+                            updateSec(p)
+                        }
+                    }
+                    containerChips.addView(btn)
+                }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+
+            ParameterType.PERCENTAGE -> {
+                tvSubtitle.text = "Set exact audio playback volume percentage."
+                tvMin.text = "0%"
+                tvMax.text = "100%"
+                seekParam.max = 100
+                seekParam.progress = selectedParamValue.coerceIn(0, 100)
+
+                fun updatePct(pct: Int) {
+                    selectedParamValue = pct
+                    tvValueDisplay.text = "$pct%"
+                }
+                updatePct(selectedParamValue)
+
+                seekParam.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                        if (fromUser) updatePct(p)
+                    }
+                    override fun onStartTrackingTouch(s: SeekBar?) {}
+                    override fun onStopTrackingTouch(s: SeekBar?) {}
+                })
+
+                val presets = listOf(15, 35, 50, 75, 100)
+                for (p in presets) {
+                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                        text = "${p}%"
+                        textSize = 11f
+                        setTextColor(Color.WHITE)
+                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                            marginEnd = 4
+                        }
+                        setOnClickListener {
+                            seekParam.progress = p
+                            updatePct(p)
+                        }
+                    }
+                    containerChips.addView(btn)
+                }
+            }
+
+            ParameterType.STEP_PERCENT -> {
+                tvSubtitle.text = "Set percentage to increment or decrement volume."
+                tvMin.text = "-30%"
+                tvMax.text = "+30%"
+                seekParam.max = 60
+                seekParam.progress = (selectedParamValue + 30).coerceIn(0, 60)
+
+                fun updateStep(step: Int) {
+                    selectedParamValue = step
+                    tvValueDisplay.text = if (step >= 0) "+$step%" else "$step%"
+                }
+                updateStep(selectedParamValue)
+
+                seekParam.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                        if (fromUser) updateStep(p - 30)
+                    }
+                    override fun onStartTrackingTouch(s: SeekBar?) {}
+                    override fun onStopTrackingTouch(s: SeekBar?) {}
+                })
+
+                val presets = listOf(5, 10, 20, -5, -10, -20)
+                for (p in presets) {
+                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                        text = if (p >= 0) "+$p%" else "$p%"
+                        textSize = 10f
+                        setTextColor(Color.WHITE)
+                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                            marginEnd = 2
+                        }
+                        setOnClickListener {
+                            seekParam.progress = (p + 30).coerceIn(0, 60)
+                            updateStep(p)
+                        }
+                    }
+                    containerChips.addView(btn)
+                }
+            }
+
+            ParameterType.NONE -> {
+                dialog.dismiss()
+                onComplete(chosenActionId)
+                return
+            }
+        }
+
+        btnCancel.setOnClickListener { dialog.dismiss() }
+        btnSave.setOnClickListener {
+            dialog.dismiss()
+            onComplete("${baseId}:${selectedParamValue}")
+        }
+
+        dialog.show()
+    }
+
+    private fun showSensitivityDialog(currentMs: Long, onSelect: (Long) -> Unit) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_sensitivity_test, null)
+
+        val tvValue = dialogView.findViewById<TextView>(R.id.tvSensitivityMsValue)
+        val tvDescriptor = dialogView.findViewById<TextView>(R.id.tvSensitivityDescriptor)
+        val seekBar = dialogView.findViewById<SeekBar>(R.id.seekSensitivity)
+
+        val btnPresetTight = dialogView.findViewById<MaterialButton>(R.id.btnPresetTight)
+        val btnPresetBalanced = dialogView.findViewById<MaterialButton>(R.id.btnPresetBalanced)
+        val btnPresetRelaxed = dialogView.findViewById<MaterialButton>(R.id.btnPresetRelaxed)
+        val btnPresetWide = dialogView.findViewById<MaterialButton>(R.id.btnPresetWide)
+
+        val btnPadUp = dialogView.findViewById<MaterialButton>(R.id.btnPadVolUp)
+        val btnPadDown = dialogView.findViewById<MaterialButton>(R.id.btnPadVolDown)
+        val tvDelta = dialogView.findViewById<TextView>(R.id.tvTestPadDelta)
+        val tvVerdict = dialogView.findViewById<TextView>(R.id.tvTestPadVerdict)
+        val btnApply = dialogView.findViewById<MaterialButton>(R.id.btnTestPadApply)
+
+        val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnSensitivityCancel)
+        val btnSave = dialogView.findViewById<MaterialButton>(R.id.btnSensitivitySave)
+
+        var selectedMs = currentMs.coerceIn(60L, 320L)
+
+        fun updateUI(ms: Long) {
+            selectedMs = ms.coerceIn(60L, 320L)
+            tvValue.text = "${selectedMs} ms"
+            seekBar.progress = (selectedMs - 60L).toInt()
+
+            val desc = when {
+                selectedMs <= 110L -> "TIGHT / RAPID"
+                selectedMs <= 155L -> "BALANCED"
+                selectedMs <= 210L -> "RELAXED"
+                else -> "ULTRA-FORGIVING"
+            }
+            tvDescriptor.text = desc
+        }
+
+        updateUI(selectedMs)
+
+        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    updateUI((progress + 60).toLong())
+                }
+            }
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) {}
+        })
+
+        btnPresetTight.setOnClickListener { updateUI(100L) }
+        btnPresetBalanced.setOnClickListener { updateUI(140L) }
+        btnPresetRelaxed.setOnClickListener { updateUI(180L) }
+        btnPresetWide.setOnClickListener { updateUI(240L) }
+
+        var testUpTime = 0L
+        var testDownTime = 0L
+
+        fun evaluateTestPress() {
+            if (testUpTime > 0 && testDownTime > 0) {
+                val diff = Math.abs(testUpTime - testDownTime)
+                if (diff < 1500) {
+                    tvDelta.text = "Measured Time Gap: ${diff} ms"
+                    if (diff <= selectedMs) {
+                        tvVerdict.text = "SUCCESS: Within window! Registered as Dual Press."
+                        tvVerdict.setTextColor(Color.parseColor("#4CAF50"))
+                        HapticFeedbackController.vibrateTick(this@MainActivity)
+                    } else {
+                        val lateBy = diff - selectedMs
+                        tvVerdict.text = "MISSED: Second key was ${lateBy}ms too late for current slider."
+                        tvVerdict.setTextColor(Color.parseColor("#E50914"))
+                    }
+
+                    val recommended = (diff + 20L).coerceIn(60L, 320L)
+                    btnApply.visibility = View.VISIBLE
+                    btnApply.text = "SET SLIDER TO ${recommended}ms (+20ms BUFFER)"
+                    btnApply.setOnClickListener {
+                        updateUI(recommended)
+                        Toast.makeText(this@MainActivity, "Slider updated to ${recommended}ms", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
+        btnPadUp.setOnClickListener {
+            testUpTime = SystemClock.uptimeMillis()
+            evaluateTestPress()
+        }
+
+        btnPadDown.setOnClickListener {
+            testDownTime = SystemClock.uptimeMillis()
+            evaluateTestPress()
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        dialog.setOnKeyListener { _, keyCode, event ->
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                    testUpTime = SystemClock.uptimeMillis()
+                    evaluateTestPress()
+                    return@setOnKeyListener true
+                } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                    testDownTime = SystemClock.uptimeMillis()
+                    evaluateTestPress()
+                    return@setOnKeyListener true
+                }
+            }
+            false
+        }
+
+        btnCancel.setOnClickListener { dialog.dismiss() }
+
+        btnSave.setOnClickListener {
+            onSelect(selectedMs)
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
     private fun showUpdateAvailableDialog(result: UpdateChecker.CheckResult) {

@@ -384,10 +384,11 @@
                         android:background="@drawable/bg_icon_circle">
 
                         <ImageView
+                            android:id="@+id/imgActionIcon1"
                             android:layout_width="18dp"
                             android:layout_height="18dp"
                             android:layout_gravity="center"
-                            app:srcCompat="@drawable/ic_play_pause"
+                            app:srcCompat="@drawable/ph_play_pause"
                             app:tint="#FFFFFF" />
                     </FrameLayout>
 
@@ -452,10 +453,11 @@
                         android:background="@drawable/bg_icon_circle">
 
                         <ImageView
+                            android:id="@+id/imgActionIcon2"
                             android:layout_width="18dp"
                             android:layout_height="18dp"
                             android:layout_gravity="center"
-                            app:srcCompat="@drawable/ic_skip_next"
+                            app:srcCompat="@drawable/ph_skip_forward"
                             app:tint="#FFFFFF" />
                     </FrameLayout>
 
@@ -520,10 +522,11 @@
                         android:background="@drawable/bg_icon_circle">
 
                         <ImageView
+                            android:id="@+id/imgActionIcon3"
                             android:layout_width="18dp"
                             android:layout_height="18dp"
                             android:layout_gravity="center"
-                            app:srcCompat="@drawable/ic_skip_previous"
+                            app:srcCompat="@drawable/ph_skip_back"
                             app:tint="#FFFFFF" />
                     </FrameLayout>
 
@@ -588,10 +591,11 @@
                         android:background="@drawable/bg_icon_circle">
 
                         <ImageView
+                            android:id="@+id/imgActionIcon4"
                             android:layout_width="18dp"
                             android:layout_height="18dp"
                             android:layout_gravity="center"
-                            app:srcCompat="@drawable/ic_fast_forward"
+                            app:srcCompat="@drawable/ph_fast_forward"
                             app:tint="#FFFFFF" />
                     </FrameLayout>
 
@@ -659,7 +663,7 @@
                             android:layout_width="18dp"
                             android:layout_height="18dp"
                             android:layout_gravity="center"
-                            app:srcCompat="@drawable/ic_tune"
+                            app:srcCompat="@drawable/ph_sliders"
                             app:tint="#FFFFFF" />
                     </FrameLayout>
 

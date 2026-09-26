@@ -80,10 +80,10 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         var dualPressWindowMs: Long = 140L
         var pauseSessionTimeoutMs: Long = 30000L
 
-        private const val DEFER_SINGLE_PRESS_MS = 65L
         private const val HOLD_THRESHOLD_MS = 450L
         private const val SEQUENCE_STEP_TIMEOUT_MS = 500L
-        private const val CONTINUOUS_RAMP_INTERVAL_MS = 55L
+        private const val INITIAL_HOLD_RAMP_DELAY_MS = 300L
+        private const val CONTINUOUS_RAMP_INTERVAL_MS = 85L
         private const val POST_ACTION_COOLDOWN_MS = 350L
 
         fun reloadPreferences(context: Context) {
@@ -401,6 +401,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     }
 
     private fun scheduleDeferredSinglePress(keyCode: Int) {
+        val deferMs = dualPressWindowMs + 10L
         val runnable = Runnable {
             adjustVolume(keyCode)
             pendingSinglePressRunnable = null
@@ -411,7 +412,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             }
         }
         pendingSinglePressRunnable = runnable
-        handler.postDelayed(runnable, DEFER_SINGLE_PRESS_MS)
+        handler.postDelayed(runnable, deferMs)
     }
 
     private fun startContinuousVolumeRamp(keyCode: Int) {
@@ -428,7 +429,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 }
             }
         }
-        handler.postDelayed(continuousRampRunnable!!, CONTINUOUS_RAMP_INTERVAL_MS)
+        handler.postDelayed(continuousRampRunnable!!, INITIAL_HOLD_RAMP_DELAY_MS)
     }
 
     private fun cancelContinuousVolumeRamp() {
@@ -535,15 +536,43 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
         LogBuffer.log("[ACTION EXECUTE] $actionId")
 
-        when (actionId) {
+        val baseAction = actionId.substringBefore(":")
+        val param = actionId.substringAfter(":", "").toIntOrNull()
+
+        when (baseAction) {
             "PLAY_PAUSE" -> sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
             "NEXT" -> sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_NEXT)
             "PREV" -> sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-            "SKIP_FWD_15" -> skipForward15()
-            "SKIP_BWD_15" -> skipBackward15()
+            "STOP" -> sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_STOP)
+
+            "SKIP_FORWARD", "SKIP_FWD_15" -> {
+                val sec = param ?: 15
+                skipForward(sec)
+            }
+            "SKIP_BACKWARD", "SKIP_BWD_15" -> {
+                val sec = param ?: 15
+                skipBackward(sec)
+            }
             "FAST_FORWARD" -> sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)
             "REWIND" -> sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_REWIND)
-            "STOP" -> sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_STOP)
+
+            "SET_VOLUME" -> {
+                val pct = (param ?: 50).coerceIn(0, 100)
+                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val targetVol = Math.round(maxVol * (pct / 100f)).coerceIn(0, maxVol)
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVol, AudioManager.FLAG_SHOW_UI)
+                LogBuffer.log("[ACTION] Set volume to $pct% ($targetVol/$maxVol)")
+            }
+            "STEP_VOLUME" -> {
+                val stepPct = param ?: 10
+                val dir = if (stepPct >= 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val count = Math.max(1, Math.round(maxVol * (Math.abs(stepPct) / 100f)))
+                repeat(count) {
+                    audioManager.adjustSuggestedStreamVolume(dir, AudioManager.USE_DEFAULT_STREAM_TYPE, AudioManager.FLAG_SHOW_UI)
+                }
+                LogBuffer.log("[ACTION] Step volume ${if (stepPct >= 0) "+$stepPct" else "$stepPct"}% ($count steps)")
+            }
 
             "MUTE" -> {
                 audioManager.adjustStreamVolume(
@@ -599,22 +628,78 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             "NOTIFICATIONS" -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
             "QUICK_SETTINGS" -> performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
 
+            "POWER_MENU" -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
+                }
+            }
+            "SPLIT_SCREEN" -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    performGlobalAction(GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN)
+                }
+            }
+            "OPEN_CAMERA" -> {
+                try {
+                    val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    LogBuffer.log("Open camera error: ${e.message}")
+                }
+            }
+            "TRIGGER_ALARM" -> {
+                try {
+                    val intent = Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    LogBuffer.log("Open alarms error: ${e.message}")
+                }
+            }
+            "TRIGGER_TIMER" -> {
+                try {
+                    val intent = Intent(android.provider.AlarmClock.ACTION_SHOW_TIMERS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    LogBuffer.log("Open timers error: ${e.message}")
+                }
+            }
+            "CALCULATOR" -> {
+                try {
+                    val intent = Intent(Intent.ACTION_MAIN).apply {
+                        addCategory(Intent.CATEGORY_APP_CALCULATOR)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    LogBuffer.log("Open calculator error: ${e.message}")
+                }
+            }
+
             else -> sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
         }
     }
 
-    private fun skipForward15() {
-        // Dispatch KEYCODE_MEDIA_SKIP_FORWARD (272) for Spotify, YouTube Music, Podcasts
-        sendMediaKeyEvent(272)
-        // Fallback for legacy media players
+    private fun skipForward(seconds: Int = 15) {
+        val count = (seconds / 15).coerceAtLeast(1)
+        repeat(count) {
+            sendMediaKeyEvent(272) // KEYCODE_MEDIA_SKIP_FORWARD
+        }
         sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)
+        LogBuffer.log("[ACTION] Skipped forward ${seconds}s ($count times)")
     }
 
-    private fun skipBackward15() {
-        // Dispatch KEYCODE_MEDIA_SKIP_BACKWARD (273) for Spotify, YouTube Music, Podcasts
-        sendMediaKeyEvent(273)
-        // Fallback for legacy media players
+    private fun skipBackward(seconds: Int = 15) {
+        val count = (seconds / 15).coerceAtLeast(1)
+        repeat(count) {
+            sendMediaKeyEvent(273) // KEYCODE_MEDIA_SKIP_BACKWARD
+        }
         sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_REWIND)
+        LogBuffer.log("[ACTION] Rewound ${seconds}s ($count times)")
     }
 
     private fun sendMediaKeyEvent(keyCode: Int) {

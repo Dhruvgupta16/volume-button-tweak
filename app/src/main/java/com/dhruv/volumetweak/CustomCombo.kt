@@ -70,13 +70,13 @@ data class CustomCombo(
 
         fun formatToken(token: String): String {
             return when (token) {
-                "DUAL" -> "Dual Press"
-                "DUAL_HOLD" -> "Hold Dual"
-                "UP" -> "Vol UP"
-                "UP_HOLD" -> "Hold UP"
-                "DOWN" -> "Vol DOWN"
-                "DOWN_HOLD" -> "Hold DOWN"
-                else -> token
+                "DUAL" -> "[ DUAL ]"
+                "DUAL_HOLD" -> "[ HOLD DUAL ]"
+                "UP" -> "[ VOL + ]"
+                "UP_HOLD" -> "[ HOLD VOL + ]"
+                "DOWN" -> "[ VOL - ]"
+                "DOWN_HOLD" -> "[ HOLD VOL - ]"
+                else -> "[ $token ]"
             }
         }
     }

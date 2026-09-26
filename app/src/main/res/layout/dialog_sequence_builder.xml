@@ -80,8 +80,11 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="6dp"
-                android:text="+ Dual Press"
+                android:text="Dual Press"
                 android:textSize="12sp"
+                app:icon="@drawable/ph_equals"
+                app:iconSize="16dp"
+                app:iconTint="#FFFFFF"
                 app:backgroundTint="#202020"
                 android:textColor="#FFFFFF"
                 app:cornerRadius="10dp" />
@@ -92,8 +95,11 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="+ Hold Dual"
+                android:text="Hold Dual"
                 android:textSize="12sp"
+                app:icon="@drawable/ph_hourglass"
+                app:iconSize="16dp"
+                app:iconTint="#FFFFFF"
                 app:backgroundTint="#202020"
                 android:textColor="#FFFFFF"
                 app:cornerRadius="10dp" />
@@ -113,8 +119,11 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="6dp"
-                android:text="+ Vol UP"
+                android:text="Vol UP"
                 android:textSize="12sp"
+                app:icon="@drawable/ph_caret_up"
+                app:iconSize="16dp"
+                app:iconTint="#FFFFFF"
                 app:backgroundTint="#202020"
                 android:textColor="#FFFFFF"
                 app:cornerRadius="10dp" />
@@ -125,8 +134,11 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="+ Hold Vol UP"
+                android:text="Hold UP"
                 android:textSize="12sp"
+                app:icon="@drawable/ph_hourglass"
+                app:iconSize="16dp"
+                app:iconTint="#FFFFFF"
                 app:backgroundTint="#202020"
                 android:textColor="#FFFFFF"
                 app:cornerRadius="10dp" />
@@ -146,8 +158,11 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="6dp"
-                android:text="+ Vol DOWN"
+                android:text="Vol DOWN"
                 android:textSize="12sp"
+                app:icon="@drawable/ph_caret_down"
+                app:iconSize="16dp"
+                app:iconTint="#FFFFFF"
                 app:backgroundTint="#202020"
                 android:textColor="#FFFFFF"
                 app:cornerRadius="10dp" />
@@ -158,8 +173,11 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="+ Hold Vol DOWN"
+                android:text="Hold DOWN"
                 android:textSize="12sp"
+                app:icon="@drawable/ph_hourglass"
+                app:iconSize="16dp"
+                app:iconTint="#FFFFFF"
                 app:backgroundTint="#202020"
                 android:textColor="#FFFFFF"
                 app:cornerRadius="10dp" />
@@ -179,7 +197,10 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="6dp"
-                android:text="⌫ Remove Last"
+                android:text="Remove Last"
+                app:icon="@drawable/ph_pencil"
+                app:iconSize="14dp"
+                app:iconTint="#A0A0A0"
                 android:textColor="#A0A0A0"
                 android:textSize="12sp" />
 
@@ -190,6 +211,9 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Clear All"
+                app:icon="@drawable/ph_trash"
+                app:iconSize="14dp"
+                app:iconTint="#D71921"
                 android:textColor="#D71921"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -216,11 +240,26 @@
             android:clickable="true"
             android:focusable="true">
 
+            <FrameLayout
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_icon_circle">
+
+                <ImageView
+                    android:id="@+id/imgBuilderActionIcon"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="center"
+                    app:srcCompat="@drawable/ph_fast_forward"
+                    app:tint="#FFFFFF" />
+            </FrameLayout>
+
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:layout_marginStart="12dp">
 
                 <TextView
                     android:id="@+id/tvBuilderActionTitle"
