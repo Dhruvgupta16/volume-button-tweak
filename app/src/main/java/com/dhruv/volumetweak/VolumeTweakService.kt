@@ -35,11 +35,14 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     // Button Physical State
     private var lastVolUpTime: Long = 0
     private var lastVolDownTime: Long = 0
+    private var lastVolUpReleaseTime: Long = 0
+    private var lastVolDownReleaseTime: Long = 0
     private var isVolUpPressed = false
     private var isVolDownPressed = false
 
     // Deferral & Continuous Ramp
     private var pendingSinglePressRunnable: Runnable? = null
+    private var pendingSinglePressKeyCode: Int = 0
     private var continuousRampRunnable: Runnable? = null
 
     // Universal Sequence Engine State
@@ -77,13 +80,13 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         var customCombos: List<CustomCombo> = CustomCombo.getDefaultCombos()
 
         // Configurable Timings
-        var dualPressWindowMs: Long = 140L
+        var dualPressWindowMs: Long = 200L
         var pauseSessionTimeoutMs: Long = 30000L
 
         private const val HOLD_THRESHOLD_MS = 450L
         private const val SEQUENCE_STEP_TIMEOUT_MS = 500L
-        private const val INITIAL_HOLD_RAMP_DELAY_MS = 300L
-        private const val CONTINUOUS_RAMP_INTERVAL_MS = 85L
+        private const val INITIAL_HOLD_RAMP_DELAY_MS = 350L
+        private const val CONTINUOUS_RAMP_INTERVAL_MS = 140L
         private const val POST_ACTION_COOLDOWN_MS = 350L
 
         fun reloadPreferences(context: Context) {
@@ -103,7 +106,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             val combosJson = prefs.getString("custom_combos_json", null)
             customCombos = CustomCombo.parseList(combosJson)
 
-            dualPressWindowMs = prefs.getLong("dual_press_window", 140L)
+            dualPressWindowMs = prefs.getLong("dual_press_window", 200L)
             targetAppPackages = prefs.getStringSet("target_apps", emptySet()) ?: emptySet()
             LogBuffer.log("[CONFIG] Preferences reloaded (${customCombos.size} combos loaded)")
         }
@@ -289,10 +292,24 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 lastVolDownTime = currentTime
             }
 
-            val timeDiff = Math.abs(lastVolUpTime - lastVolDownTime)
+            val timeDiff = if (lastVolUpTime > 0L && lastVolDownTime > 0L) {
+                Math.abs(lastVolUpTime - lastVolDownTime)
+            } else {
+                Long.MAX_VALUE
+            }
 
-            // 1. Dual-Press Detection (Simultaneous press within timing window)
-            if (isVolUpPressed && isVolDownPressed && timeDiff <= dualPressWindowMs) {
+            val isSimultaneousDown = isVolUpPressed && isVolDownPressed
+            val isSuccessiveRoll = (timeDiff <= dualPressWindowMs) &&
+                    (currentTime - Math.min(lastVolUpTime, lastVolDownTime) <= dualPressWindowMs)
+
+            // 1. Dual-Press Detection (Simultaneous or rapid one-thumb rocker roll within window)
+            if ((isSimultaneousDown || isSuccessiveRoll) && timeDiff <= dualPressWindowMs && !isDualPressActive) {
+                // Invalidate timestamps so a trailing key doesn't re-trigger dual press
+                lastVolUpTime = 0L
+                lastVolDownTime = 0L
+                lastVolUpReleaseTime = 0L
+                lastVolDownReleaseTime = 0L
+
                 cancelPendingSinglePress()
                 cancelContinuousVolumeRamp()
                 cancelActiveHoldTimer()
@@ -301,17 +318,19 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 isDualTokenEmitted = false
                 isHoldTriggered = false
 
-                // Start Dual Hold Timer (500ms)
-                activeHoldRunnable = Runnable {
-                    if (isVolUpPressed && isVolDownPressed) {
-                        isHoldTriggered = true
-                        isDualTokenEmitted = true
-                        HapticFeedbackController.vibrateTick(this@VolumeTweakService)
-                        LogBuffer.log("[INPUT] Token: DUAL_HOLD")
-                        appendTokenAndEvaluate("DUAL_HOLD")
+                // Start Dual Hold Timer (500ms) only if both keys are physically down
+                if (isVolUpPressed && isVolDownPressed) {
+                    activeHoldRunnable = Runnable {
+                        if (isVolUpPressed && isVolDownPressed) {
+                            isHoldTriggered = true
+                            isDualTokenEmitted = true
+                            HapticFeedbackController.vibrateTick(this@VolumeTweakService)
+                            LogBuffer.log("[INPUT] Token: DUAL_HOLD")
+                            appendTokenAndEvaluate("DUAL_HOLD")
+                        }
                     }
+                    handler.postDelayed(activeHoldRunnable!!, HOLD_THRESHOLD_MS + 50L)
                 }
-                handler.postDelayed(activeHoldRunnable!!, HOLD_THRESHOLD_MS + 50L)
                 return true
             }
 
@@ -339,6 +358,12 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 return true
             }
 
+            // If user taps the SAME button rapidly, flush the previous pending press immediately
+            if (pendingSinglePressRunnable != null && pendingSinglePressKeyCode == keyCode) {
+                adjustVolume(keyCode)
+                cancelPendingSinglePress()
+            }
+
             cancelPendingSinglePress()
             scheduleDeferredSinglePress(keyCode)
             return true
@@ -347,8 +372,10 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             val wasVolUp = (keyCode == KeyEvent.KEYCODE_VOLUME_UP)
             if (wasVolUp) {
                 isVolUpPressed = false
+                lastVolUpReleaseTime = currentTime
             } else {
                 isVolDownPressed = false
+                lastVolDownReleaseTime = currentTime
             }
 
             // Cancel any pending hold timer immediately upon release
@@ -380,14 +407,11 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 return true
             }
 
-            // 3. Normal Volume Key Release: Stop continuous ramp & fire quick tap immediately
+            // 3. Normal Volume Key Release: Stop continuous ramp
+            // NOTE: Do NOT immediately adjust volume here; let pendingSinglePressRunnable execute
+            // when its window expires so dual-press rolling thumb won't leak a volume bar!
             cancelContinuousVolumeRamp()
-            if (pendingSinglePressRunnable != null) {
-                cancelPendingSinglePress()
-                adjustVolume(keyCode)
-                return true
-            }
-            return false
+            return true
         }
 
         return false
@@ -401,10 +425,13 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     }
 
     private fun scheduleDeferredSinglePress(keyCode: Int) {
-        val deferMs = dualPressWindowMs + 10L
+        cancelPendingSinglePress()
+        pendingSinglePressKeyCode = keyCode
+        val deferMs = dualPressWindowMs + 15L
         val runnable = Runnable {
             adjustVolume(keyCode)
             pendingSinglePressRunnable = null
+            pendingSinglePressKeyCode = 0
 
             val isStillPressed = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolUpPressed else isVolDownPressed
             if (isStillPressed && !isDualPressActive && !isSequenceActive) {
@@ -418,10 +445,14 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     private fun startContinuousVolumeRamp(keyCode: Int) {
         cancelContinuousVolumeRamp()
         val direction = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+        val rampStartTime = SystemClock.uptimeMillis()
         continuousRampRunnable = object : Runnable {
             override fun run() {
+                val now = SystemClock.uptimeMillis()
                 val isStillPressed = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolUpPressed else isVolDownPressed
-                if (isStillPressed && !isDualPressActive && !isSequenceActive) {
+                val exceededMaxDuration = (now - rampStartTime) > 3500L
+
+                if (isStillPressed && !isDualPressActive && !isSequenceActive && !exceededMaxDuration) {
                     audioManager.adjustSuggestedStreamVolume(direction, AudioManager.USE_DEFAULT_STREAM_TYPE, AudioManager.FLAG_SHOW_UI)
                     handler.postDelayed(this, CONTINUOUS_RAMP_INTERVAL_MS)
                 } else {
@@ -443,6 +474,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         pendingSinglePressRunnable?.let {
             handler.removeCallbacks(it)
             pendingSinglePressRunnable = null
+            pendingSinglePressKeyCode = 0
         }
     }
 
@@ -527,6 +559,11 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
     private fun executeConfiguredAction(actionId: String) {
         lastActionExecuteTime = SystemClock.uptimeMillis()
+        cancelContinuousVolumeRamp()
+        cancelPendingSinglePress()
+        isVolUpPressed = false
+        isVolDownPressed = false
+
         if (glyphReactionEnabled) {
             GlyphController.pulse(1)
         }
@@ -617,7 +654,9 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
             "TAKE_SCREENSHOT" -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT)
+                    handler.postDelayed({
+                        performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT)
+                    }, 150L)
                 }
             }
             "LOCK_SCREEN" -> {
@@ -685,30 +724,46 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     }
 
     private fun skipForward(seconds: Int = 15) {
-        val count = (seconds / 15).coerceAtLeast(1)
-        repeat(count) {
-            sendMediaKeyEvent(272) // KEYCODE_MEDIA_SKIP_FORWARD
-        }
-        sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)
+        val count = (seconds / 15).coerceIn(1, 10)
+        sendChainedMediaKey(272, count) // 272 = KEYCODE_MEDIA_SKIP_FORWARD
         LogBuffer.log("[ACTION] Skipped forward ${seconds}s ($count times)")
     }
 
     private fun skipBackward(seconds: Int = 15) {
-        val count = (seconds / 15).coerceAtLeast(1)
-        repeat(count) {
-            sendMediaKeyEvent(273) // KEYCODE_MEDIA_SKIP_BACKWARD
-        }
-        sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_REWIND)
+        val count = (seconds / 15).coerceIn(1, 10)
+        sendChainedMediaKey(273, count) // 273 = KEYCODE_MEDIA_SKIP_BACKWARD
         LogBuffer.log("[ACTION] Rewound ${seconds}s ($count times)")
     }
 
-    private fun sendMediaKeyEvent(keyCode: Int) {
-        val now = SystemClock.uptimeMillis()
-        val downEvent = KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0)
-        val upEvent = KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0)
+    private fun sendChainedMediaKey(keyCode: Int, repeatCount: Int, currentIndex: Int = 0) {
+        if (currentIndex >= repeatCount) return
+        sendMediaKeyEvent(keyCode, holdDurationMs = 50L) {
+            if (currentIndex + 1 < repeatCount) {
+                handler.postDelayed({
+                    sendChainedMediaKey(keyCode, repeatCount, currentIndex + 1)
+                }, 100L)
+            }
+        }
+    }
 
+    private fun sendMediaKeyEvent(keyCode: Int, holdDurationMs: Long = 50L, onComplete: (() -> Unit)? = null) {
+        val downTime = SystemClock.uptimeMillis()
+        val downEvent = KeyEvent(downTime, downTime, KeyEvent.ACTION_DOWN, keyCode, 0)
         audioManager.dispatchMediaKeyEvent(downEvent)
-        audioManager.dispatchMediaKeyEvent(upEvent)
+
+        if (holdDurationMs > 0) {
+            handler.postDelayed({
+                val upTime = SystemClock.uptimeMillis()
+                val upEvent = KeyEvent(downTime, upTime, KeyEvent.ACTION_UP, keyCode, 0)
+                audioManager.dispatchMediaKeyEvent(upEvent)
+                onComplete?.invoke()
+            }, holdDurationMs)
+        } else {
+            val upTime = SystemClock.uptimeMillis()
+            val upEvent = KeyEvent(downTime, upTime, KeyEvent.ACTION_UP, keyCode, 0)
+            audioManager.dispatchMediaKeyEvent(upEvent)
+            onComplete?.invoke()
+        }
     }
 
     private fun isAppWhitelisted(): Boolean {

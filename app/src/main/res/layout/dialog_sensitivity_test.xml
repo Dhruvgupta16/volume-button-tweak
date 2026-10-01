@@ -82,14 +82,14 @@
                     android:letterSpacing="0.05" />
             </LinearLayout>
 
-            <!-- Continuous SeekBar (60ms to 320ms) -->
+            <!-- Continuous SeekBar (60ms to 400ms) -->
             <SeekBar
                 android:id="@+id/seekSensitivity"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:max="260"
-                android:progress="80"
+                android:max="340"
+                android:progress="140"
                 android:progressTint="#D71921"
                 android:thumbTint="#FFFFFF" />
 
@@ -110,7 +110,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="320ms (Forgiving)"
+                    android:text="400ms (One-Thumb / Wide)"
                     android:textColor="#555555"
                     android:textSize="10.5sp" />
             </LinearLayout>
@@ -152,7 +152,7 @@
                 android:layout_height="38dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
-                android:text="140ms"
+                android:text="160ms"
                 android:textSize="11sp"
                 app:backgroundTint="#1E1E1E"
                 android:textColor="#CCCCCC"
@@ -165,7 +165,7 @@
                 android:layout_height="38dp"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
-                android:text="180ms"
+                android:text="220ms"
                 android:textSize="11sp"
                 app:backgroundTint="#1E1E1E"
                 android:textColor="#CCCCCC"
@@ -177,7 +177,7 @@
                 android:layout_width="0dp"
                 android:layout_height="38dp"
                 android:layout_weight="1"
-                android:text="240ms"
+                android:text="280ms"
                 android:textSize="11sp"
                 app:backgroundTint="#1E1E1E"
                 android:textColor="#CCCCCC"

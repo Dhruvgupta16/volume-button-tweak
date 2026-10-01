@@ -80,7 +80,7 @@ class MainActivity : AppCompatActivity() {
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
-    private var currentVersionName = "1.9.6"
+    private var currentVersionName = "1.9.7"
 
     private val customCombosList = mutableListOf<CustomCombo>()
 
@@ -141,7 +141,7 @@ class MainActivity : AppCompatActivity() {
         // Dynamic Version Display
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
-            currentVersionName = pInfo.versionName ?: "1.9.2"
+            currentVersionName = pInfo.versionName ?: "1.9.7"
             val vCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 pInfo.longVersionCode
             } else {
@@ -149,7 +149,7 @@ class MainActivity : AppCompatActivity() {
             }
             tvAppVersion.text = "v$currentVersionName (Build $vCode)"
         } catch (e: Exception) {
-            tvAppVersion.text = "v1.9.2 (Build 12)"
+            tvAppVersion.text = "v1.9.7 (Build 17)"
         }
 
         // Check for Updates
@@ -235,7 +235,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Sensitivity (Dual-Press Window) Customizer with Live Test Pad
-        val windowMs = prefs.getLong("dual_press_window", 140L)
+        val windowMs = prefs.getLong("dual_press_window", 200L)
         VolumeTweakService.dualPressWindowMs = windowMs
         tvSensitivity.text = formatSensitivityLabel(windowMs)
         rowSensitivity.setOnClickListener {
@@ -519,9 +519,9 @@ class MainActivity : AppCompatActivity() {
     private fun formatSensitivityLabel(ms: Long): String {
         val desc = when {
             ms <= 110L -> "Tight"
-            ms <= 155L -> "Balanced"
-            ms <= 210L -> "Relaxed"
-            else -> "Forgiving"
+            ms <= 170L -> "Balanced"
+            ms <= 240L -> "Relaxed"
+            else -> "One-Thumb"
         }
         return "$desc (${ms}ms)"
     }
@@ -780,18 +780,18 @@ class MainActivity : AppCompatActivity() {
         val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnSensitivityCancel)
         val btnSave = dialogView.findViewById<MaterialButton>(R.id.btnSensitivitySave)
 
-        var selectedMs = currentMs.coerceIn(60L, 320L)
+        var selectedMs = currentMs.coerceIn(60L, 400L)
 
         fun updateUI(ms: Long) {
-            selectedMs = ms.coerceIn(60L, 320L)
+            selectedMs = ms.coerceIn(60L, 400L)
             tvValue.text = "${selectedMs} ms"
             seekBar.progress = (selectedMs - 60L).toInt()
 
             val desc = when {
                 selectedMs <= 110L -> "TIGHT / RAPID"
-                selectedMs <= 155L -> "BALANCED"
-                selectedMs <= 210L -> "RELAXED"
-                else -> "ULTRA-FORGIVING"
+                selectedMs <= 170L -> "BALANCED"
+                selectedMs <= 240L -> "RELAXED"
+                else -> "ONE-THUMB / WIDE"
             }
             tvDescriptor.text = desc
         }
@@ -809,9 +809,9 @@ class MainActivity : AppCompatActivity() {
         })
 
         btnPresetTight.setOnClickListener { updateUI(100L) }
-        btnPresetBalanced.setOnClickListener { updateUI(140L) }
-        btnPresetRelaxed.setOnClickListener { updateUI(180L) }
-        btnPresetWide.setOnClickListener { updateUI(240L) }
+        btnPresetBalanced.setOnClickListener { updateUI(160L) }
+        btnPresetRelaxed.setOnClickListener { updateUI(220L) }
+        btnPresetWide.setOnClickListener { updateUI(280L) }
 
         var testUpTime = 0L
         var testDownTime = 0L
@@ -831,7 +831,7 @@ class MainActivity : AppCompatActivity() {
                         tvVerdict.setTextColor(Color.parseColor("#E50914"))
                     }
 
-                    val recommended = (diff + 20L).coerceIn(60L, 320L)
+                    val recommended = (diff + 20L).coerceIn(60L, 400L)
                     btnApply.visibility = View.VISIBLE
                     btnApply.text = "SET SLIDER TO ${recommended}ms (+20ms BUFFER)"
                     btnApply.setOnClickListener {
