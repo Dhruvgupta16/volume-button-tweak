@@ -53,6 +53,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     private var isHoldTriggered = false
     private var activeHoldRunnable: Runnable? = null
     private var pendingSequenceTimeoutRunnable: Runnable? = null
+    private var pendingSequenceTapRunnable: Runnable? = null
     private var lastActionExecuteTime: Long = 0
 
     // Session memory to support resume when music was paused via tweak
@@ -68,6 +69,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         var hapticReactionEnabled: Boolean = true
         var proximitySensorEnabled: Boolean = false
         var targetAppPackages: Set<String> = emptySet()
+        var testPadListener: ((keyCode: Int, isDown: Boolean) -> Unit)? = null
 
         // Standard Dual-Press Multi-Click Gestures
         var action1Click: String = "PLAY_PAUSE"
@@ -84,7 +86,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         var pauseSessionTimeoutMs: Long = 30000L
 
         private const val HOLD_THRESHOLD_MS = 450L
-        private const val SEQUENCE_STEP_TIMEOUT_MS = 500L
+        private const val SEQUENCE_STEP_TIMEOUT_MS = 650L
         private const val INITIAL_HOLD_RAMP_DELAY_MS = 350L
         private const val CONTINUOUS_RAMP_INTERVAL_MS = 140L
         private const val POST_ACTION_COOLDOWN_MS = 350L
@@ -229,6 +231,16 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
+        // Direct stream to live Hardware Test Pad if active
+        val testListener = testPadListener
+        if (testListener != null) {
+            val keyCode = event.keyCode
+            if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                testListener.invoke(keyCode, event.action == KeyEvent.ACTION_DOWN)
+                return true
+            }
+        }
+
         // Master Kill Switch: If suspended, pass all keys through with 0 overhead
         if (isServiceSuspended) {
             return false
@@ -277,6 +289,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             isDualTokenEmitted = false
             cancelContinuousVolumeRamp()
             cancelPendingSinglePress()
+            cancelPendingSequenceTap()
             return false
         }
 
@@ -284,6 +297,11 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         wakeLock?.acquire(1000)
 
         if (action == KeyEvent.ACTION_DOWN) {
+            // Pause idle sequence timeout immediately whenever buttons are being pressed or held
+            pendingSequenceTimeoutRunnable?.let { handler.removeCallbacks(it) }
+            pendingSequenceTimeoutRunnable = null
+            cancelPendingSequenceTap()
+
             if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
                 isVolUpPressed = true
                 lastVolUpTime = currentTime
@@ -311,6 +329,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 lastVolDownReleaseTime = 0L
 
                 cancelPendingSinglePress()
+                cancelPendingSequenceTap()
                 cancelContinuousVolumeRamp()
                 cancelActiveHoldTimer()
 
@@ -383,6 +402,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
             // 1. Releasing from Dual Press
             if (isDualPressActive) {
+                cancelPendingSequenceTap()
                 if (!isHoldTriggered && !isDualTokenEmitted) {
                     isDualTokenEmitted = true
                     LogBuffer.log("[INPUT] Token: DUAL")
@@ -400,21 +420,32 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             if (isSequenceActive) {
                 if (!isHoldTriggered) {
                     val tapToken = if (wasVolUp) "UP" else "DOWN"
-                    LogBuffer.log("[INPUT] Token: $tapToken")
-                    appendTokenAndEvaluate(tapToken)
+                    cancelPendingSequenceTap()
+                    val runnable = Runnable {
+                        LogBuffer.log("[INPUT] Token: $tapToken")
+                        appendTokenAndEvaluate(tapToken)
+                        pendingSequenceTapRunnable = null
+                    }
+                    pendingSequenceTapRunnable = runnable
+                    handler.postDelayed(runnable, dualPressWindowMs + 15L)
                 }
                 isHoldTriggered = false
                 return true
             }
 
             // 3. Normal Volume Key Release: Stop continuous ramp
-            // NOTE: Do NOT immediately adjust volume here; let pendingSinglePressRunnable execute
-            // when its window expires so dual-press rolling thumb won't leak a volume bar!
             cancelContinuousVolumeRamp()
             return true
         }
 
         return false
+    }
+
+    private fun cancelPendingSequenceTap() {
+        pendingSequenceTapRunnable?.let {
+            handler.removeCallbacks(it)
+            pendingSequenceTapRunnable = null
+        }
     }
 
     private fun cancelActiveHoldTimer() {
@@ -553,6 +584,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     private fun resetSequenceState() {
         pendingSequenceTimeoutRunnable?.let { handler.removeCallbacks(it) }
         pendingSequenceTimeoutRunnable = null
+        cancelPendingSequenceTap()
         currentSequence.clear()
         isSequenceActive = false
     }
@@ -561,6 +593,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         lastActionExecuteTime = SystemClock.uptimeMillis()
         cancelContinuousVolumeRamp()
         cancelPendingSinglePress()
+        cancelPendingSequenceTap()
         isVolUpPressed = false
         isVolDownPressed = false
 
@@ -590,8 +623,11 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 val sec = param ?: 15
                 skipBackward(sec)
             }
-            "FAST_FORWARD" -> sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)
-            "REWIND" -> sendMediaKeyEvent(KeyEvent.KEYCODE_MEDIA_REWIND)
+            "LIKE_TRACK" -> {
+                val success = MediaNotificationListener.likeCurrentTrack(this)
+                HapticFeedbackController.vibrateTick(this)
+                LogBuffer.log("[ACTION] Like track (Success: $success)")
+            }
 
             "SET_VOLUME" -> {
                 val pct = (param ?: 50).coerceIn(0, 100)
@@ -610,7 +646,6 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 }
                 LogBuffer.log("[ACTION] Step volume ${if (stepPct >= 0) "+$stepPct" else "$stepPct"}% ($count steps)")
             }
-
             "MUTE" -> {
                 audioManager.adjustStreamVolume(
                     AudioManager.STREAM_MUSIC,
@@ -618,26 +653,84 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                     AudioManager.FLAG_SHOW_UI
                 )
             }
-            "VOL_MAX" -> {
-                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVol, AudioManager.FLAG_SHOW_UI)
-            }
-            "VOL_50" -> {
-                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVol / 2, AudioManager.FLAG_SHOW_UI)
-            }
-            "VOL_MIN" -> {
-                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                val quietVol = (maxVol * 0.12f).toInt().coerceAtLeast(1)
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, quietVol, AudioManager.FLAG_SHOW_UI)
-            }
 
+            "TTS_TRACK_INFO" -> {
+                val track = MediaNotificationListener.getCurrentTrackInfo(this)
+                audioPromptHelper.speakTrackInfo(track?.first, track?.second)
+            }
             "TTS_TIME" -> audioPromptHelper.speakTime()
             "TTS_BATTERY" -> audioPromptHelper.speakBattery()
+            "TTS_LAST_NOTIFICATION" -> {
+                val notif = MediaNotificationListener.getLastNotificationText()
+                audioPromptHelper.speakNotification(notif)
+            }
+
+            "LAUNCH_APP" -> {
+                val targetPkg = if (actionId.contains(":")) actionId.substringAfter(":") else "com.dhruv.volumetweak"
+                val launchIntent = packageManager.getLaunchIntentForPackage(targetPkg)
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(launchIntent)
+                    LogBuffer.log("[ACTION] Launched app: $targetPkg")
+                } else {
+                    LogBuffer.log("[ACTION ERROR] App not found: $targetPkg")
+                }
+            }
+
+            "TOGGLE_RINGER_MODE" -> {
+                val currentMode = audioManager.ringerMode
+                val nextMode = when (currentMode) {
+                    AudioManager.RINGER_MODE_NORMAL -> AudioManager.RINGER_MODE_VIBRATE
+                    AudioManager.RINGER_MODE_VIBRATE -> AudioManager.RINGER_MODE_SILENT
+                    else -> AudioManager.RINGER_MODE_NORMAL
+                }
+                try {
+                    audioManager.ringerMode = nextMode
+                    val modeName = when (nextMode) {
+                        AudioManager.RINGER_MODE_NORMAL -> {
+                            HapticFeedbackController.vibrate(this, 1)
+                            "NORMAL (RING)"
+                        }
+                        AudioManager.RINGER_MODE_VIBRATE -> {
+                            HapticFeedbackController.vibrate(this, 2)
+                            "VIBRATE"
+                        }
+                        else -> {
+                            HapticFeedbackController.vibrate(this, 3)
+                            "SILENT"
+                        }
+                    }
+                    LogBuffer.log("[ACTION] Ringer mode changed to $modeName")
+                } catch (e: Exception) {
+                    LogBuffer.log("[ACTION RINGER ERROR] ${e.message}")
+                }
+            }
+
+            "COPY_TRACK_NAME" -> {
+                val track = MediaNotificationListener.getCurrentTrackInfo(this)
+                if (track != null) {
+                    val text = "${track.first} - ${track.second}"
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("TrackName", text))
+                    HapticFeedbackController.vibrateTick(this)
+                    LogBuffer.log("[ACTION] Copied track: $text")
+                } else {
+                    LogBuffer.log("[ACTION] No active track to copy")
+                }
+            }
 
             "FLASHLIGHT_TOGGLE" -> {
                 val isOn = GlyphController.toggleTorch()
                 LogBuffer.log("[ACTION] Flashlight ${if (isOn) "ON" else "OFF"}")
+            }
+            "FLASHLIGHT_TIMER" -> {
+                val sec = param ?: 30
+                GlyphController.turnOnTorch()
+                LogBuffer.log("[ACTION] Flashlight ON for ${sec}s timer")
+                handler.postDelayed({
+                    GlyphController.turnOffTorch()
+                    LogBuffer.log("[ACTION] Flashlight auto-off timer expired")
+                }, sec * 1000L)
             }
             "FLASHLIGHT_PULSE" -> GlyphController.pulse(2)
 
@@ -699,12 +792,20 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             }
             "TRIGGER_TIMER" -> {
                 try {
-                    val intent = Intent(android.provider.AlarmClock.ACTION_SHOW_TIMERS).apply {
+                    val minutes = param ?: 5
+                    val intent = Intent(android.provider.AlarmClock.ACTION_SET_TIMER).apply {
+                        putExtra(android.provider.AlarmClock.EXTRA_LENGTH, minutes * 60)
+                        putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, "Volume Tweak Timer")
+                        putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     startActivity(intent)
+                    LogBuffer.log("[ACTION] Started timer for ${minutes}m")
                 } catch (e: Exception) {
-                    LogBuffer.log("Open timers error: ${e.message}")
+                    val fallback = Intent(android.provider.AlarmClock.ACTION_SHOW_TIMERS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(fallback)
                 }
             }
             "CALCULATOR" -> {
@@ -724,15 +825,21 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     }
 
     private fun skipForward(seconds: Int = 15) {
-        val count = (seconds / 15).coerceIn(1, 10)
-        sendChainedMediaKey(272, count) // 272 = KEYCODE_MEDIA_SKIP_FORWARD
-        LogBuffer.log("[ACTION] Skipped forward ${seconds}s ($count times)")
+        val handled = MediaNotificationListener.seekActiveSession(this, seconds)
+        if (!handled) {
+            val count = (seconds / 15).coerceIn(1, 10)
+            sendChainedMediaKey(272, count) // 272 = KEYCODE_MEDIA_SKIP_FORWARD
+        }
+        LogBuffer.log("[ACTION] Skipped forward ${seconds}s (MediaSession seek: $handled)")
     }
 
     private fun skipBackward(seconds: Int = 15) {
-        val count = (seconds / 15).coerceIn(1, 10)
-        sendChainedMediaKey(273, count) // 273 = KEYCODE_MEDIA_SKIP_BACKWARD
-        LogBuffer.log("[ACTION] Rewound ${seconds}s ($count times)")
+        val handled = MediaNotificationListener.seekActiveSession(this, -seconds)
+        if (!handled) {
+            val count = (seconds / 15).coerceIn(1, 10)
+            sendChainedMediaKey(273, count) // 273 = KEYCODE_MEDIA_SKIP_BACKWARD
+        }
+        LogBuffer.log("[ACTION] Rewound ${seconds}s (MediaSession seek: $handled)")
     }
 
     private fun sendChainedMediaKey(keyCode: Int, repeatCount: Int, currentIndex: Int = 0) {
@@ -770,11 +877,26 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         if (targetAppPackages.isEmpty() || testModeEnabled) {
             return true
         }
-        val pkg = detectedPlayingPackage
-        if (pkg != null) {
-            return targetAppPackages.contains(pkg)
+
+        // 1. Check MediaSession active playing package (accurate for Morphe, YT Music, Spotify)
+        val sessionPkg = MediaNotificationListener.getActivePlayingPackage(this)
+        if (sessionPkg != null && targetAppPackages.contains(sessionPkg)) {
+            return true
         }
-        return true
+
+        // 2. Check audio playback configuration detected package
+        val detectedPkg = detectedPlayingPackage
+        if (detectedPkg != null && targetAppPackages.contains(detectedPkg)) {
+            return true
+        }
+
+        // 3. Check foreground active window package
+        val windowPkg = rootInActiveWindow?.packageName?.toString()
+        if (windowPkg != null && targetAppPackages.contains(windowPkg)) {
+            return true
+        }
+
+        return false
     }
 
     override fun onDestroy() {

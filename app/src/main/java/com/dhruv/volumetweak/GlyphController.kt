@@ -67,4 +67,30 @@ object GlyphController {
             false
         }
     }
+
+    fun turnOnTorch(): Boolean {
+        val cid = cameraId ?: return false
+        val cm = cameraManager ?: return false
+        return try {
+            isTorchOn = true
+            cm.setTorchMode(cid, true)
+            true
+        } catch (e: Exception) {
+            isTorchOn = false
+            false
+        }
+    }
+
+    fun turnOffTorch(): Boolean {
+        val cid = cameraId ?: return false
+        val cm = cameraManager ?: return false
+        return try {
+            isTorchOn = false
+            cm.setTorchMode(cid, false)
+            true
+        } catch (e: Exception) {
+            isTorchOn = false
+            false
+        }
+    }
 }

@@ -34,10 +34,12 @@ import com.google.android.material.materialswitch.MaterialSwitch
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvStatus: TextView
+    private lateinit var tvNotificationStatus: TextView
     private lateinit var tvAppVersion: TextView
     private lateinit var btnCheckUpdates: View
     private lateinit var tvUpdateStatus: TextView
     private lateinit var btnEnableService: MaterialButton
+    private lateinit var btnEnableNotificationService: MaterialButton
 
     private lateinit var switchMasterKill: MaterialSwitch
     private lateinit var tvMasterStatusTitle: TextView
@@ -80,7 +82,7 @@ class MainActivity : AppCompatActivity() {
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
-    private var currentVersionName = "1.9.7"
+    private var currentVersionName = "1.9.8"
 
     private val customCombosList = mutableListOf<CustomCombo>()
 
@@ -92,10 +94,12 @@ class MainActivity : AppCompatActivity() {
 
         // Bind Views
         tvStatus = findViewById(R.id.tvStatus)
+        tvNotificationStatus = findViewById(R.id.tvNotificationStatus)
         tvAppVersion = findViewById(R.id.tvAppVersion)
         btnCheckUpdates = findViewById(R.id.btnCheckUpdates)
         tvUpdateStatus = findViewById(R.id.tvUpdateStatus)
         btnEnableService = findViewById(R.id.btnEnableService)
+        btnEnableNotificationService = findViewById(R.id.btnEnableNotificationService)
 
         switchMasterKill = findViewById(R.id.switchMasterKill)
         tvMasterStatusTitle = findViewById(R.id.tvMasterStatusTitle)
@@ -328,6 +332,11 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
+        btnEnableNotificationService.setOnClickListener {
+            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+            startActivity(intent)
+        }
+
         btnClearLogs.setOnClickListener {
             LogBuffer.clear()
         }
@@ -552,12 +561,54 @@ class MainActivity : AppCompatActivity() {
     private fun handleActionSelection(title: String, currentAction: String, onFinalAction: (String) -> Unit) {
         showActionPicker(title, currentAction) { chosenActionId ->
             val actionDef = ActionRegistry.getAction(chosenActionId)
-            if (actionDef != null && actionDef.parameterType != ParameterType.NONE) {
-                showParameterDialog(chosenActionId, currentAction, onFinalAction)
+            if (actionDef != null) {
+                if (actionDef.parameterType == ParameterType.PACKAGE_NAME) {
+                    showSingleAppPickerDialog(currentAction, onFinalAction)
+                } else if (actionDef.parameterType != ParameterType.NONE) {
+                    showParameterDialog(chosenActionId, currentAction, onFinalAction)
+                } else {
+                    onFinalAction(chosenActionId)
+                }
             } else {
                 onFinalAction(chosenActionId)
             }
         }
+    }
+
+    private fun showSingleAppPickerDialog(currentActionStr: String, onComplete: (String) -> Unit) {
+        val pm = packageManager
+        val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+
+        val appList = mutableListOf<AppItem>()
+        appList.add(AppItem("Volume Button Tweak (This App)", packageName))
+
+        for (app in installedApps) {
+            val pkg = app.packageName
+            if (pkg == packageName) continue
+            val launchIntent = pm.getLaunchIntentForPackage(pkg)
+            if (launchIntent != null) {
+                val label = pm.getApplicationLabel(app).toString()
+                appList.add(AppItem(label, pkg))
+            }
+        }
+
+        val ourApp = appList.removeAt(0)
+        appList.sortBy { it.label.lowercase() }
+        appList.add(0, ourApp)
+
+        val appNames = appList.map { it.label }.toTypedArray()
+        val currentPkg = ActionRegistry.getParam(currentActionStr) ?: packageName
+        val checkedIndex = appList.indexOfFirst { it.packageName == currentPkg }.coerceAtLeast(0)
+
+        AlertDialog.Builder(this)
+            .setTitle("Select App to Launch")
+            .setSingleChoiceItems(appNames, checkedIndex) { dialog, which ->
+                val selectedPkg = appList[which].packageName
+                onComplete("LAUNCH_APP:$selectedPkg")
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showActionPicker(title: String, currentActionId: String, onSelect: (String) -> Unit) {
@@ -602,7 +653,7 @@ class MainActivity : AppCompatActivity() {
     private fun showParameterDialog(chosenActionId: String, currentActionStr: String, onComplete: (String) -> Unit) {
         val baseId = ActionRegistry.getBaseId(chosenActionId)
         val actionDef = ActionRegistry.getAction(baseId) ?: return onComplete(chosenActionId)
-        val currentParam = ActionRegistry.getParam(currentActionStr) ?: actionDef.defaultParam
+        val currentParam = ActionRegistry.getIntParam(currentActionStr) ?: (actionDef.defaultParam.toIntOrNull() ?: 15)
 
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_action_parameter, null)
         val imgIcon = dialogView.findViewById<ImageView>(R.id.imgParamActionIcon)
@@ -620,6 +671,7 @@ class MainActivity : AppCompatActivity() {
         tvTitle.text = actionDef.title.uppercase()
 
         var selectedParamValue = currentParam
+        val dp = resources.displayMetrics.density
 
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
@@ -647,14 +699,17 @@ class MainActivity : AppCompatActivity() {
                     override fun onStopTrackingTouch(s: SeekBar?) {}
                 })
 
-                val presets = listOf(5, 10, 15, 30, 45, 60)
+                val presets = listOf(5, 10, 15, 20, 30, 45, 60, 90, 120)
                 for (p in presets) {
                     val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
                         text = "${p}s"
-                        textSize = 11f
+                        textSize = 12f
+                        isSingleLine = true
+                        minWidth = 0
+                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
                         setTextColor(Color.WHITE)
-                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                            marginEnd = 4
+                        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                            marginEnd = (8 * dp).toInt()
                         }
                         setOnClickListener {
                             seekParam.progress = (p - 5).coerceIn(0, 115)
@@ -686,14 +741,17 @@ class MainActivity : AppCompatActivity() {
                     override fun onStopTrackingTouch(s: SeekBar?) {}
                 })
 
-                val presets = listOf(15, 35, 50, 75, 100)
+                val presets = listOf(0, 10, 25, 35, 50, 65, 75, 85, 100)
                 for (p in presets) {
                     val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
                         text = "${p}%"
-                        textSize = 11f
+                        textSize = 12f
+                        isSingleLine = true
+                        minWidth = 0
+                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
                         setTextColor(Color.WHITE)
-                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                            marginEnd = 4
+                        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                            marginEnd = (8 * dp).toInt()
                         }
                         setOnClickListener {
                             seekParam.progress = p
@@ -725,14 +783,17 @@ class MainActivity : AppCompatActivity() {
                     override fun onStopTrackingTouch(s: SeekBar?) {}
                 })
 
-                val presets = listOf(5, 10, 20, -5, -10, -20)
+                val presets = listOf(5, 10, 15, 20, 25, -5, -10, -15, -20, -25)
                 for (p in presets) {
                     val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
                         text = if (p >= 0) "+$p%" else "$p%"
-                        textSize = 10f
+                        textSize = 12f
+                        isSingleLine = true
+                        minWidth = 0
+                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
                         setTextColor(Color.WHITE)
-                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                            marginEnd = 2
+                        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                            marginEnd = (8 * dp).toInt()
                         }
                         setOnClickListener {
                             seekParam.progress = (p + 30).coerceIn(0, 60)
@@ -743,7 +804,49 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            ParameterType.NONE -> {
+            ParameterType.MINUTES -> {
+                tvSubtitle.text = "Set countdown timer duration in minutes."
+                tvMin.text = "1m"
+                tvMax.text = "60m"
+                seekParam.max = 59
+                seekParam.progress = (selectedParamValue - 1).coerceIn(0, 59)
+
+                fun updateMin(min: Int) {
+                    selectedParamValue = min
+                    tvValueDisplay.text = "$min min"
+                }
+                updateMin(selectedParamValue)
+
+                seekParam.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                        if (fromUser) updateMin(p + 1)
+                    }
+                    override fun onStartTrackingTouch(s: SeekBar?) {}
+                    override fun onStopTrackingTouch(s: SeekBar?) {}
+                })
+
+                val presets = listOf(1, 2, 3, 5, 10, 15, 20, 30, 45, 60)
+                for (p in presets) {
+                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                        text = "${p}m"
+                        textSize = 12f
+                        isSingleLine = true
+                        minWidth = 0
+                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
+                        setTextColor(Color.WHITE)
+                        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                            marginEnd = (8 * dp).toInt()
+                        }
+                        setOnClickListener {
+                            seekParam.progress = (p - 1).coerceIn(0, 59)
+                            updateMin(p)
+                        }
+                    }
+                    containerChips.addView(btn)
+                }
+            }
+
+            ParameterType.NONE, ParameterType.PACKAGE_NAME -> {
                 dialog.dismiss()
                 onComplete(chosenActionId)
                 return
@@ -856,14 +959,41 @@ class MainActivity : AppCompatActivity() {
             .setView(dialogView)
             .create()
 
+        // Forward physical hardware key presses directly from accessibility service
+        VolumeTweakService.testPadListener = { keyCode, isDown ->
+            if (isDown) {
+                runOnUiThread {
+                    if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                        testUpTime = SystemClock.uptimeMillis()
+                        btnPadUp.isPressed = true
+                        btnPadUp.postDelayed({ btnPadUp.isPressed = false }, 180)
+                        evaluateTestPress()
+                    } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                        testDownTime = SystemClock.uptimeMillis()
+                        btnPadDown.isPressed = true
+                        btnPadDown.postDelayed({ btnPadDown.isPressed = false }, 180)
+                        evaluateTestPress()
+                    }
+                }
+            }
+        }
+
+        dialog.setOnDismissListener {
+            VolumeTweakService.testPadListener = null
+        }
+
         dialog.setOnKeyListener { _, keyCode, event ->
             if (event.action == KeyEvent.ACTION_DOWN) {
                 if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
                     testUpTime = SystemClock.uptimeMillis()
+                    btnPadUp.isPressed = true
+                    btnPadUp.postDelayed({ btnPadUp.isPressed = false }, 180)
                     evaluateTestPress()
                     return@setOnKeyListener true
                 } else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
                     testDownTime = SystemClock.uptimeMillis()
+                    btnPadDown.isPressed = true
+                    btnPadDown.postDelayed({ btnPadDown.isPressed = false }, 180)
                     evaluateTestPress()
                     return@setOnKeyListener true
                 }
@@ -1084,6 +1214,24 @@ class MainActivity : AppCompatActivity() {
             btnEnableService.text = "Enable Accessibility Service"
             btnEnableService.isEnabled = true
         }
+
+        val isNotifEnabled = isNotificationServiceEnabled(this)
+        if (isNotifEnabled) {
+            tvNotificationStatus.text = "ACTIVE"
+            tvNotificationStatus.setTextColor(Color.parseColor("#4CAF50"))
+            btnEnableNotificationService.visibility = View.GONE
+        } else {
+            tvNotificationStatus.text = "DISABLED"
+            tvNotificationStatus.setTextColor(Color.parseColor("#E50914"))
+            btnEnableNotificationService.visibility = View.VISIBLE
+            btnEnableNotificationService.text = "Enable Media Seeking (YT Music / Spotify)"
+            btnEnableNotificationService.isEnabled = true
+        }
+    }
+
+    private fun isNotificationServiceEnabled(context: Context): Boolean {
+        val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+        return flat != null && flat.contains(context.packageName)
     }
 
     private fun isAccessibilityServiceEnabled(context: Context, serviceClass: Class<*>): Boolean {

@@ -54,6 +54,27 @@ class AudioPromptHelper(private val context: Context) : TextToSpeech.OnInitListe
         }
     }
 
+    fun speakTrackInfo(title: String?, artist: String?) {
+        if (!title.isNullOrBlank()) {
+            val text = if (!artist.isNullOrBlank()) {
+                "Now playing $title by $artist"
+            } else {
+                "Now playing $title"
+            }
+            speak(text)
+        } else {
+            speak("No track currently playing")
+        }
+    }
+
+    fun speakNotification(text: String?) {
+        if (!text.isNullOrBlank()) {
+            speak(text)
+        } else {
+            speak("No recent notifications")
+        }
+    }
+
     fun speak(text: String) {
         if (isTtsReady && tts != null) {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "VolumeTweakAudioPrompt")

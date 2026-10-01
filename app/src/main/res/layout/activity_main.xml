@@ -143,6 +143,49 @@
                     android:textStyle="bold"
                     app:backgroundTint="#D71921"
                     app:cornerRadius="12dp" />
+
+                <!-- Notification Listener Permission (for Universal Media Seeking) -->
+                <LinearLayout
+                    android:id="@+id/layoutNotificationBanner"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp"
+                    android:background="#141414"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="8dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Media / Notification Access"
+                        android:textColor="#9E9E9E"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tvNotificationStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="DISABLED"
+                        android:textColor="#E50914"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.05" />
+                </LinearLayout>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnEnableNotificationService"
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:layout_marginTop="6dp"
+                    android:text="Enable Media Seeking (YT Music / Spotify)"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    app:backgroundTint="#262626"
+                    app:cornerRadius="12dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

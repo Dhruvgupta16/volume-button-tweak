@@ -104,14 +104,21 @@
         android:textSize="10.5sp"
         android:textStyle="bold" />
 
-    <LinearLayout
-        android:id="@+id/containerParamChips"
+    <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:orientation="horizontal">
-        <!-- Dynamically populated or preset buttons -->
-    </LinearLayout>
+        android:scrollbars="none"
+        android:overScrollMode="never">
+
+        <LinearLayout
+            android:id="@+id/containerParamChips"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <!-- Dynamically populated or preset buttons -->
+        </LinearLayout>
+    </HorizontalScrollView>
 
     <!-- Action Buttons -->
     <LinearLayout
