@@ -96,7 +96,7 @@ object LogBuffer {
         sb.append("========== VOLUME BUTTON TWEAK DIAGNOSTIC REPORT ==========\n")
         sb.append("Generated At: ${timeFormat.format(Date())}\n")
         sb.append("Device: ${Build.MANUFACTURER} ${Build.MODEL} (Android ${Build.VERSION.RELEASE}, API ${Build.VERSION.SDK_INT})\n")
-        sb.append("App Version: v1.9.8 (Build 18)\n")
+        sb.append("App Version: v1.9.9 (Build 19)\n")
         sb.append("Time Range Filter: ${if (hoursAgo <= 0) "All Available Logs" else "Past $hoursAgo Hour(s)"}\n")
 
         if (userNote.isNotBlank()) {

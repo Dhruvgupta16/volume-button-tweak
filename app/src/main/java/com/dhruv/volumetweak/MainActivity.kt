@@ -86,7 +86,7 @@ class MainActivity : AppCompatActivity() {
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
-    private var currentVersionName = "1.9.8"
+    private var currentVersionName = "1.9.9"
 
     private val customCombosList = mutableListOf<CustomCombo>()
 
@@ -152,7 +152,7 @@ class MainActivity : AppCompatActivity() {
         // Dynamic Version Display
         try {
             val pInfo = packageManager.getPackageInfo(packageName, 0)
-            currentVersionName = pInfo.versionName ?: "1.9.7"
+            currentVersionName = pInfo.versionName ?: "1.9.9"
             val vCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 pInfo.longVersionCode
             } else {
@@ -160,7 +160,7 @@ class MainActivity : AppCompatActivity() {
             }
             tvAppVersion.text = "v$currentVersionName (Build $vCode)"
         } catch (e: Exception) {
-            tvAppVersion.text = "v1.9.7 (Build 17)"
+            tvAppVersion.text = "v1.9.9 (Build 19)"
         }
 
         // Check for Updates
