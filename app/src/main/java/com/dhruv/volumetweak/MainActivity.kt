@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -19,6 +20,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -72,6 +74,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var switchProximity: MaterialSwitch
     private lateinit var switchGlyph: MaterialSwitch
     private lateinit var switchTestMode: MaterialSwitch
+    private lateinit var switchAlwaysActive: MaterialSwitch
     private lateinit var layoutWhitelistSelector: View
     private lateinit var tvWhitelistSummary: TextView
 
@@ -79,6 +82,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var scrollLogs: ScrollView
     private lateinit var btnClearLogs: View
     private lateinit var btnCopyLogs: View
+    private lateinit var btnSendDiagnosticReport: View
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
@@ -132,6 +136,7 @@ class MainActivity : AppCompatActivity() {
         switchProximity = findViewById(R.id.switchProximity)
         switchGlyph = findViewById(R.id.switchGlyph)
         switchTestMode = findViewById(R.id.switchTestMode)
+        switchAlwaysActive = findViewById(R.id.switchAlwaysActive)
         layoutWhitelistSelector = findViewById(R.id.layoutWhitelistSelector)
         tvWhitelistSummary = findViewById(R.id.tvWhitelistSummary)
 
@@ -139,8 +144,10 @@ class MainActivity : AppCompatActivity() {
         scrollLogs = findViewById(R.id.scrollLogs)
         btnClearLogs = findViewById(R.id.btnClearLogs)
         btnCopyLogs = findViewById(R.id.btnCopyLogs)
+        btnSendDiagnosticReport = findViewById(R.id.btnSendDiagnosticReport)
 
         val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
+        LogBuffer.init(this)
 
         // Dynamic Version Display
         try {
@@ -308,6 +315,16 @@ class MainActivity : AppCompatActivity() {
             LogBuffer.log("Test mode: ${if (isChecked) "ON (Music bypass active)" else "OFF (Music required)"}")
         }
 
+        // Always-Active Mode Switch
+        val isAlwaysActive = prefs.getBoolean("always_active", true)
+        switchAlwaysActive.isChecked = isAlwaysActive
+        VolumeTweakService.alwaysActiveEnabled = isAlwaysActive
+        switchAlwaysActive.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("always_active", isChecked).apply()
+            VolumeTweakService.alwaysActiveEnabled = isChecked
+            LogBuffer.log("Always-active mode: ${if (isChecked) "ENABLED (Works even when music paused)" else "DISABLED (Music playback required)"}")
+        }
+
         // Glyph Switch
         val isGlyph = prefs.getBoolean("glyph_reaction", false)
         switchGlyph.isChecked = isGlyph
@@ -351,6 +368,10 @@ class MainActivity : AppCompatActivity() {
             } else {
                 Toast.makeText(this, "No logs to copy", Toast.LENGTH_SHORT).show()
             }
+        }
+
+        btnSendDiagnosticReport.setOnClickListener {
+            showDiagnosticReportDialog()
         }
     }
 
@@ -701,13 +722,12 @@ class MainActivity : AppCompatActivity() {
 
                 val presets = listOf(5, 10, 15, 20, 30, 45, 60, 90, 120)
                 for (p in presets) {
-                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                    val btn = MaterialButton(androidx.appcompat.view.ContextThemeWrapper(this, R.style.Widget_VolumeTweak_PresetChip)).apply {
                         text = "${p}s"
                         textSize = 12f
                         isSingleLine = true
-                        minWidth = 0
-                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
-                        setTextColor(Color.WHITE)
+                        maxLines = 1
+                        minWidth = (56 * dp).toInt()
                         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                             marginEnd = (8 * dp).toInt()
                         }
@@ -743,13 +763,12 @@ class MainActivity : AppCompatActivity() {
 
                 val presets = listOf(0, 10, 25, 35, 50, 65, 75, 85, 100)
                 for (p in presets) {
-                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                    val btn = MaterialButton(androidx.appcompat.view.ContextThemeWrapper(this, R.style.Widget_VolumeTweak_PresetChip)).apply {
                         text = "${p}%"
                         textSize = 12f
                         isSingleLine = true
-                        minWidth = 0
-                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
-                        setTextColor(Color.WHITE)
+                        maxLines = 1
+                        minWidth = (56 * dp).toInt()
                         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                             marginEnd = (8 * dp).toInt()
                         }
@@ -785,13 +804,12 @@ class MainActivity : AppCompatActivity() {
 
                 val presets = listOf(5, 10, 15, 20, 25, -5, -10, -15, -20, -25)
                 for (p in presets) {
-                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                    val btn = MaterialButton(androidx.appcompat.view.ContextThemeWrapper(this, R.style.Widget_VolumeTweak_PresetChip)).apply {
                         text = if (p >= 0) "+$p%" else "$p%"
                         textSize = 12f
                         isSingleLine = true
-                        minWidth = 0
-                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
-                        setTextColor(Color.WHITE)
+                        maxLines = 1
+                        minWidth = (56 * dp).toInt()
                         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                             marginEnd = (8 * dp).toInt()
                         }
@@ -827,13 +845,12 @@ class MainActivity : AppCompatActivity() {
 
                 val presets = listOf(1, 2, 3, 5, 10, 15, 20, 30, 45, 60)
                 for (p in presets) {
-                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                    val btn = MaterialButton(androidx.appcompat.view.ContextThemeWrapper(this, R.style.Widget_VolumeTweak_PresetChip)).apply {
                         text = "${p}m"
                         textSize = 12f
                         isSingleLine = true
-                        minWidth = 0
-                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
-                        setTextColor(Color.WHITE)
+                        maxLines = 1
+                        minWidth = (56 * dp).toInt()
                         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                             marginEnd = (8 * dp).toInt()
                         }
@@ -1151,6 +1168,69 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun showDiagnosticReportDialog() {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_diagnostic_report, null)
+        val btnRange1h = dialogView.findViewById<MaterialButton>(R.id.btnRange1h)
+        val btnRange5h = dialogView.findViewById<MaterialButton>(R.id.btnRange5h)
+        val btnRange24h = dialogView.findViewById<MaterialButton>(R.id.btnRange24h)
+        val btnRangeAll = dialogView.findViewById<MaterialButton>(R.id.btnRangeAll)
+        val etDiagnosticNote = dialogView.findViewById<EditText>(R.id.etDiagnosticNote)
+        val btnReportCancel = dialogView.findViewById<MaterialButton>(R.id.btnReportCancel)
+        val btnReportSend = dialogView.findViewById<MaterialButton>(R.id.btnReportSend)
+
+        var selectedHours = 24 // Default past 24 hours
+
+        fun updateFilterButtons(hours: Int) {
+            selectedHours = hours
+            val activeBg = ColorStateList.valueOf(Color.parseColor("#D71921"))
+            val inactiveBg = ColorStateList.valueOf(Color.parseColor("#1E1E1E"))
+            val activeText = Color.WHITE
+            val inactiveText = Color.parseColor("#CCCCCC")
+
+            btnRange1h.backgroundTintList = if (hours == 1) activeBg else inactiveBg
+            btnRange1h.setTextColor(if (hours == 1) activeText else inactiveText)
+
+            btnRange5h.backgroundTintList = if (hours == 5) activeBg else inactiveBg
+            btnRange5h.setTextColor(if (hours == 5) activeText else inactiveText)
+
+            btnRange24h.backgroundTintList = if (hours == 24) activeBg else inactiveBg
+            btnRange24h.setTextColor(if (hours == 24) activeText else inactiveText)
+
+            btnRangeAll.backgroundTintList = if (hours <= 0) activeBg else inactiveBg
+            btnRangeAll.setTextColor(if (hours <= 0) activeText else inactiveText)
+        }
+
+        updateFilterButtons(24)
+
+        btnRange1h.setOnClickListener { updateFilterButtons(1) }
+        btnRange5h.setOnClickListener { updateFilterButtons(5) }
+        btnRange24h.setOnClickListener { updateFilterButtons(24) }
+        btnRangeAll.setOnClickListener { updateFilterButtons(0) }
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        btnReportCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        btnReportSend.setOnClickListener {
+            val note = etDiagnosticNote.text.toString().trim()
+            val reportText = LogBuffer.generateDiagnosticReport(this, selectedHours, note)
+
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "Volume Button Tweak - Diagnostic Report")
+                putExtra(Intent.EXTRA_TEXT, reportText)
+            }
+            startActivity(Intent.createChooser(shareIntent, "Share Diagnostic Report"))
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
     override fun onResume() {

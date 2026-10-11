@@ -30,12 +30,14 @@ object ActionRegistry {
         TweakAction("SKIP_FORWARD", "Custom Skip Forward", "Media Controls", "Skip forward customizable seconds (YT Music, Spotify, etc.)", R.drawable.ph_fast_forward, ParameterType.SECONDS, "15"),
         TweakAction("SKIP_BACKWARD", "Custom Rewind", "Media Controls", "Rewind customizable seconds (YT Music, Spotify, etc.)", R.drawable.ph_rewind, ParameterType.SECONDS, "15"),
         TweakAction("LIKE_TRACK", "Like / Favorite Song", "Media Controls", "Like current track in YT Music / Spotify", R.drawable.ph_heart),
+        TweakAction("CYCLE_PLAYBACK_SPEED", "Cycle Speed (1x-2x)", "Media Controls", "Cycles media speed (1.0x -> 1.25x -> 1.5x -> 2.0x)", R.drawable.ph_fast_forward),
         TweakAction("STOP", "Stop Playback", "Media Controls", "Halt audio playback completely", R.drawable.ph_power),
 
         // Volume Controls
         TweakAction("MUTE", "Toggle Mute / Unmute", "Volume Controls", "Mute or unmute media stream", R.drawable.ph_speaker_slash),
         TweakAction("SET_VOLUME", "Set Exact Volume %", "Volume Controls", "Set media stream volume to a specific percentage", R.drawable.ph_speaker_simple_high, ParameterType.PERCENTAGE, "50"),
         TweakAction("STEP_VOLUME", "Step Volume %", "Volume Controls", "Raise or lower volume by custom percentage", R.drawable.ph_speaker_high, ParameterType.STEP_PERCENT, "10"),
+        TweakAction("SAFE_VOLUME_CAP", "Safe Ear Protection Cap (75%)", "Volume Controls", "Caps media volume to safe 75% for ear protection", R.drawable.ph_speaker_low),
 
         // Headphone Audio Readouts (TTS)
         TweakAction("TTS_TRACK_INFO", "Whisper Song Title in Ear", "Headphone Readouts", "Speaks currently playing song and artist into headphones", R.drawable.ph_music_notes),
@@ -46,6 +48,7 @@ object ActionRegistry {
         // App Launchers & Custom Apps
         TweakAction("LAUNCH_APP", "Launch Specific App", "App Launchers", "Open Volume Button Tweak or any installed app", R.drawable.ph_sliders, ParameterType.PACKAGE_NAME, "com.dhruv.volumetweak"),
         TweakAction("OPEN_CAMERA", "Open Camera", "App Launchers", "Launch stock camera app immediately", R.drawable.ph_camera),
+        TweakAction("TOGGLE_VOICE_RECORDER", "Quick Voice Memo", "App Launchers", "Launches system voice recorder or note app", R.drawable.ph_microphone),
         TweakAction("CALCULATOR", "Open Calculator", "App Launchers", "Launch system calculator", R.drawable.ph_calculator),
 
         // System & Hardware

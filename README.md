@@ -1,51 +1,36 @@
-# Volume Button Tweak
+# Volume Tweak
 
-A low-footprint Android accessibility utility designed for Nothing OS and Android 8.0+. It maps simultaneous hardware Volume Up and Volume Down key presses to media control commands during active audio playback.
+## Overview
+Volume Tweak is an Android Accessibility Service that intercepts hardware volume button events and maps them to a flexible set of user‑defined actions.  It works system‑wide, even when the target media app does not expose standard playback controls.
 
----
+## Features
+- **Gesture remapping** – single, double, triple and quadruple volume‑button presses, plus dual‑press and dual‑hold combos.
+- **Custom actions** – media control, app launch, system utilities, ear‑protection caps, playback‑speed cycling, voice recorder shortcut, etc.
+- **Safety enhancements** – `SAFE_VOLUME_CAP` limits media volume to 75 % to protect hearing.
+- **Call handling** – volume keys adjust call volume directly when a cellular or VoIP call is active.
+- **Diagnostic logging** – persistent rolling log with a one‑tap “Send Diagnostic Report” UI.
+- **Open‑app shortcut** – quick button to launch the tweak UI itself.
+- **Configurable sensitivity** – dual‑press detection window adjustable from the UI.
+- **Custom combo sequences** – user‑defined token chains mapped to any action.
 
-## Control Mapping & Customization
+## Installation
+1. Clone or download the repository.
+2. Open the project in Android Studio (minimum API 23).
+3. Build the app (`./gradlew assembleDebug`).
+4. Install the generated APK on your device.
+5. Open **Settings → Accessibility** and enable **Volume Tweak**.
+6. Open **Settings → Notification access** and enable **Volume Tweak** for media control.
 
-| Action | Hardware Trigger | Configurable Default |
-| :--- | :--- | :--- |
-| Single Click | 1 Simultaneous Press (Vol Up + Down) | Play / Pause (Reassignable to Next, Prev, Mute, Flashlight) |
-| Double Click | 2 Simultaneous Presses | Next Track (Reassignable to Play/Pause, Prev) |
-| Triple Click | 3 Simultaneous Presses | Previous Track (Reassignable to Next, Play/Pause) |
-| Volume Ramping | Press and Hold | Continuous volume step adjustments (smooth stock Android ramping) |
+## Usage
+- Open the app to configure gestures, choose actions, and toggle hardware preferences.
+- The UI reflects the current configuration; changes are saved automatically.
+- Use the **Send Diagnostic Report** button to share logs for troubleshooting.
 
----
+## Development
+- The core service lives in `VolumeTweakService.kt`.
+- All actions are defined in `ActionRegistry.kt` – add new actions by inserting a `TweakAction` entry.
+- UI bindings are in `MainActivity.kt`; layout is `activity_main.xml`.
+- Logging is handled by `LogBuffer.kt`, which writes a rolling file to internal storage.
 
-## Architecture & Features
-
-### Continuous Volume Ramping
-- Fixes accessibility key repeat suppression by running a localized continuous stepper (`110ms` interval) while a single volume key is physically held down.
-- Single clicks adjust volume by 1 notch after the initial deferral window, and immediately ramp continuously if held down.
-- Simultaneous presses are intercepted within the sensitivity window and dispatched to configured media commands without affecting volume.
-
-### Master Kill Switch
-- Allows suspending all gesture interception in 1 tap without disabling the Android Accessibility Service in system settings.
-- When suspended, key events bypass all logic with zero latency.
-
-### In-App Update Engine
-- Direct integration with the GitHub Releases API (`https://api.github.com/repos/Dhruvgupta16/volume-button-tweak/releases/latest`).
-- Detects newer semantic releases and provides a 1-tap download prompt.
-
-### Multi-App Whitelist Picker
-- Select any installed media applications via an interactive multi-choice picker (e.g. YouTube Music, Spotify, Apple Music, VLC, Audible). When active, volume controls only trigger if the playing media originated from one of the designated apps.
-
-### Haptic Feedback & Glyph Interface
-- Tactile feedback: 1 pulse (40ms) for Play/Pause, 2 pulses for Next, 3 pulses for Previous via `VibrationAttributes.USAGE_MEDIA`.
-- Nothing Phone (2a) Glyph pulse support: Rear LED flash pulses on gesture confirmation.
-
-### Resource Footprint
-- Average Process Memory: 3 to 5 MB Private RAM (~40 MB total PSS with shared framework mappings).
-- CPU Utilization: Below 0.1% using event-driven kernel counters.
-
----
-
-## Installation & Setup
-
-1. Download the latest release APK from GitHub Actions artifacts or releases.
-2. Install the package on the device.
-3. Launch the application and select **Enable Accessibility Service**.
-4. In system settings, navigate to **Installed apps > Volume Button Tweak** and toggle the service on.
+## License
+This project is released under the MIT License. See the `LICENSE` file for details.
