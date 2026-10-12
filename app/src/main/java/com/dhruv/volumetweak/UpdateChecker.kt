@@ -183,17 +183,45 @@ object UpdateChecker {
         }
     }
 
-    private fun isNewerVersion(current: String, remote: String): Boolean {
-        if (remote.isBlank()) return false
-        val currentParts = current.split(".").mapNotNull { it.toIntOrNull() }
-        val remoteParts = remote.split(".").mapNotNull { it.toIntOrNull() }
+    data class VersionChunk(val num: Int, val suffix: String) : Comparable<VersionChunk> {
+        override fun compareTo(other: VersionChunk): Int {
+            if (this.num != other.num) {
+                return this.num.compareTo(other.num)
+            }
+            if (this.suffix.isEmpty() && other.suffix.isNotEmpty()) {
+                return -1
+            }
+            if (this.suffix.isNotEmpty() && other.suffix.isEmpty()) {
+                return 1
+            }
+            return this.suffix.compareTo(other.suffix, ignoreCase = true)
+        }
+    }
 
-        val maxLen = maxOf(currentParts.size, remoteParts.size)
+    private fun parseVersionChunk(str: String): VersionChunk {
+        val trimmed = str.trim()
+        val match = Regex("""^(\d*)(.*)$""").find(trimmed)
+        val num = match?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        val suffix = match?.groupValues?.get(2)?.trim() ?: ""
+        return VersionChunk(num, suffix)
+    }
+
+    internal fun isNewerVersion(current: String, remote: String): Boolean {
+        if (remote.isBlank()) return false
+        val cClean = current.removePrefix("v").removePrefix("V").trim()
+        val rClean = remote.removePrefix("v").removePrefix("V").trim()
+        if (cClean.equals(rClean, ignoreCase = true)) return false
+
+        val cChunks = cClean.split(".").map { parseVersionChunk(it) }
+        val rChunks = rClean.split(".").map { parseVersionChunk(it) }
+
+        val maxLen = maxOf(cChunks.size, rChunks.size)
         for (i in 0 until maxLen) {
-            val cur = currentParts.getOrElse(i) { 0 }
-            val rem = remoteParts.getOrElse(i) { 0 }
-            if (rem > cur) return true
-            if (rem < cur) return false
+            val c = cChunks.getOrElse(i) { VersionChunk(0, "") }
+            val r = rChunks.getOrElse(i) { VersionChunk(0, "") }
+            val cmp = r.compareTo(c)
+            if (cmp > 0) return true
+            if (cmp < 0) return false
         }
         return false
     }

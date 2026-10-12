@@ -190,7 +190,7 @@ class MainActivity : AppCompatActivity() {
                     val msg = if (result.errorMessage != null) {
                         "Checked: ${result.errorMessage}"
                     } else {
-                        "You are on the latest version (${result.latestVersion})"
+                        "Already on the latest build (v$currentVersionName)"
                     }
                     Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
                 }
