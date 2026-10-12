@@ -100,6 +100,28 @@ class MediaNotificationListener : NotificationListenerService() {
             }
         }
 
+        private var currentPlaybackSpeed: Float = 1.0f
+
+        fun cyclePlaybackSpeed(context: Context): Float {
+            val controller = getActiveMediaController(context)
+            val nextSpeed = when {
+                currentPlaybackSpeed < 1.1f -> 1.25f
+                currentPlaybackSpeed < 1.3f -> 1.5f
+                currentPlaybackSpeed < 1.7f -> 2.0f
+                else -> 1.0f
+            }
+            currentPlaybackSpeed = nextSpeed
+            if (controller != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                try {
+                    controller.transportControls.setPlaybackSpeed(nextSpeed)
+                    LogBuffer.log("[MEDIA SPEED] Playback speed set to ${nextSpeed}x on ${controller.packageName}")
+                } catch (e: Exception) {
+                    LogBuffer.log("[MEDIA SPEED NOTE] ${e.message}")
+                }
+            }
+            return nextSpeed
+        }
+
         fun getLastNotificationText(): String? {
             return lastNotificationSummary
         }

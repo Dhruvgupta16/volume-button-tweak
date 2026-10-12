@@ -68,36 +68,63 @@
                         </LinearLayout>
                     </LinearLayout>
 
-                    <!-- Check for Updates Pill Button -->
+                    <!-- Update and Rollback Controls -->
                     <LinearLayout
-                        android:id="@+id/btnCheckUpdates"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
                         android:layout_centerVertical="true"
-                        android:background="@drawable/bg_pill_badge"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="7dp"
-                        android:gravity="center_vertical"
-                        android:clickable="true"
-                        android:focusable="true">
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
-                        <ImageView
-                            android:id="@+id/ivUpdateIcon"
-                            android:layout_width="14dp"
-                            android:layout_height="14dp"
-                            app:srcCompat="@drawable/ic_refresh"
-                            app:tint="#D0D0D0" />
+                        <!-- Discreet Rollback Version Button -->
+                        <FrameLayout
+                            android:id="@+id/btnRollbackVersion"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:layout_marginEnd="6dp"
+                            android:background="@drawable/bg_pill_badge"
+                            android:contentDescription="Rollback to previous version"
+                            android:clickable="true"
+                            android:focusable="true">
 
-                        <TextView
-                            android:id="@+id/tvUpdateStatus"
+                            <ImageView
+                                android:layout_width="15dp"
+                                android:layout_height="15dp"
+                                android:layout_gravity="center"
+                                app:srcCompat="@drawable/ic_history"
+                                app:tint="#888888" />
+                        </FrameLayout>
+
+                        <!-- Check for Updates Pill Button -->
+                        <LinearLayout
+                            android:id="@+id/btnCheckUpdates"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:text="Check Update"
-                            android:textColor="#D0D0D0"
-                            android:textSize="11sp"
-                            android:textStyle="bold" />
+                            android:background="@drawable/bg_pill_badge"
+                            android:paddingHorizontal="12dp"
+                            android:paddingVertical="7dp"
+                            android:gravity="center_vertical"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:id="@+id/ivUpdateIcon"
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                app:srcCompat="@drawable/ic_refresh"
+                                app:tint="#D0D0D0" />
+
+                            <TextView
+                                android:id="@+id/tvUpdateStatus"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:text="Check Update"
+                                android:textColor="#D0D0D0"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
                     </LinearLayout>
                 </RelativeLayout>
 
@@ -1052,6 +1079,67 @@
                     android:background="#181818"
                     android:layout_marginVertical="8dp" />
 
+                <!-- Always-Active Mode Switch -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <FrameLayout
+                        android:id="@+id/iconAlwaysActive"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:background="@drawable/bg_icon_circle">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ic_power"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_toEndOf="@id/iconAlwaysActive"
+                        android:layout_toStartOf="@id/switchAlwaysActive"
+                        android:layout_centerVertical="true"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Always-Active Mode"
+                            android:textColor="#E0E0E0"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Execute gestures anytime, even with no music playing"
+                            android:textColor="#666666"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchAlwaysActive"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:checked="true" />
+                </RelativeLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#181818"
+                    android:layout_marginVertical="8dp" />
+
                 <!-- Test Mode Switch -->
                 <RelativeLayout
                     android:layout_width="match_parent"
@@ -1171,6 +1259,137 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Theme Customization Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardThemes"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="#0D0D0D"
+            app:cardCornerRadius="18dp"
+            app:strokeColor="#1F1F1F"
+            app:strokeWidth="1dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <FrameLayout
+                        android:id="@+id/iconThemePalette"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:background="@drawable/bg_icon_circle">
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ph_palette"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_toEndOf="@id/iconThemePalette"
+                        android:layout_centerVertical="true"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="INTERFACE THEME"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.06" />
+
+                        <TextView
+                            android:id="@+id/tvCurrentThemeName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Nothing Crimson Red (Default)"
+                            android:textColor="#7A7A7A"
+                            android:textSize="11sp"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <!-- Horizontal scrollable theme pills -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeRed"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:text="Crimson"
+                            app:strokeColor="#D71921"
+                            android:textColor="#FFFFFF" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeCyan"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:text="Cyber Cyan"
+                            app:strokeColor="#00E5FF"
+                            android:textColor="#E0E0E0" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeMono"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:text="Monochrome"
+                            app:strokeColor="#FFFFFF"
+                            android:textColor="#E0E0E0" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeAmber"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:text="Amber Glow"
+                            app:strokeColor="#FF9100"
+                            android:textColor="#E0E0E0" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeGreen"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:text="Matrix Green"
+                            app:strokeColor="#00E676"
+                            android:textColor="#E0E0E0" />
+                    </LinearLayout>
+                </HorizontalScrollView>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Real-time Console Log Card -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
@@ -1225,6 +1444,25 @@
                         android:layout_alignParentEnd="true"
                         android:layout_centerVertical="true"
                         android:orientation="horizontal">
+
+                        <!-- Send / Export Diagnostic Report Button -->
+                        <FrameLayout
+                            android:id="@+id/btnSendDiagnosticReport"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:layout_marginEnd="8dp"
+                            android:background="@drawable/bg_icon_circle"
+                            android:contentDescription="Export Diagnostic Report"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="16dp"
+                                android:layout_height="16dp"
+                                android:layout_gravity="center"
+                                app:srcCompat="@drawable/ic_export"
+                                app:tint="#B0B0B0" />
+                        </FrameLayout>
 
                         <FrameLayout
                             android:id="@+id/btnCopyLogs"

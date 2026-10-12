@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.File
@@ -28,10 +29,19 @@ object UpdateChecker {
         val errorMessage: String? = null
     )
 
+    data class ReleaseItem(
+        val tag: String,
+        val name: String,
+        val body: String,
+        val apkUrl: String?,
+        val publishedAt: String
+    )
+
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private const val GITHUB_REPO_API = "https://api.github.com/repos/Dhruvgupta16/volume-button-tweak/releases/latest"
+    private const val GITHUB_REPO_RELEASES_LIST_API = "https://api.github.com/repos/Dhruvgupta16/volume-button-tweak/releases"
     private const val GITHUB_RELEASES_WEB = "https://github.com/Dhruvgupta16/volume-button-tweak/releases"
 
     fun checkForUpdate(currentVersionName: String, onResult: (CheckResult) -> Unit) {
@@ -106,6 +116,69 @@ object UpdateChecker {
                     errorMessage = e.message ?: "Failed to connect to GitHub"
                 )
                 mainHandler.post { onResult(result) }
+            }
+        }
+    }
+
+    fun fetchReleaseHistory(onResult: (List<ReleaseItem>, String?) -> Unit) {
+        executor.execute {
+            try {
+                val url = URL(GITHUB_REPO_RELEASES_LIST_API)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 8000
+                connection.readTimeout = 8000
+                connection.setRequestProperty("User-Agent", "VolumeButtonTweak-App")
+                connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+
+                val responseCode = connection.responseCode
+                if (responseCode == 200) {
+                    val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                    val response = reader.readText()
+                    reader.close()
+
+                    val jsonArray = JSONArray(response)
+                    val releases = mutableListOf<ReleaseItem>()
+                    for (i in 0 until jsonArray.length()) {
+                        val relObj = jsonArray.getJSONObject(i)
+                        val tag = relObj.optString("tag_name", "").trim()
+                        val name = relObj.optString("name", tag).ifBlank { tag }
+                        val body = relObj.optString("body", "No release notes available.")
+                        val publishedAt = relObj.optString("published_at", "")
+
+                        var apkUrl: String? = null
+                        val assets = relObj.optJSONArray("assets")
+                        if (assets != null) {
+                            for (j in 0 until assets.length()) {
+                                val asset = assets.getJSONObject(j)
+                                val assetName = asset.optString("name", "")
+                                if (assetName.endsWith(".apk", ignoreCase = true)) {
+                                    apkUrl = asset.optString("browser_download_url", null)
+                                    break
+                                }
+                            }
+                        }
+                        if (apkUrl == null) {
+                            apkUrl = relObj.optString("html_url", GITHUB_RELEASES_WEB)
+                        }
+
+                        if (tag.isNotBlank()) {
+                            releases.add(
+                                ReleaseItem(
+                                    tag = tag,
+                                    name = name,
+                                    body = body,
+                                    apkUrl = apkUrl,
+                                    publishedAt = publishedAt
+                                )
+                            )
+                        }
+                    }
+                    mainHandler.post { onResult(releases, null) }
+                } else {
+                    mainHandler.post { onResult(emptyList(), "GitHub returned HTTP $responseCode") }
+                }
+            } catch (e: Exception) {
+                mainHandler.post { onResult(emptyList(), e.message ?: "Failed to fetch releases") }
             }
         }
     }

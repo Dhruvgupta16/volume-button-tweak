@@ -19,10 +19,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
+import androidx.appcompat.view.ContextThemeWrapper
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
@@ -71,18 +73,28 @@ class MainActivity : AppCompatActivity() {
     private lateinit var switchHaptic: MaterialSwitch
     private lateinit var switchProximity: MaterialSwitch
     private lateinit var switchGlyph: MaterialSwitch
+    private lateinit var switchAlwaysActive: MaterialSwitch
     private lateinit var switchTestMode: MaterialSwitch
     private lateinit var layoutWhitelistSelector: View
     private lateinit var tvWhitelistSummary: TextView
+
+    private lateinit var btnRollbackVersion: View
+    private lateinit var tvCurrentThemeName: TextView
+    private lateinit var btnThemeRed: MaterialButton
+    private lateinit var btnThemeCyan: MaterialButton
+    private lateinit var btnThemeMono: MaterialButton
+    private lateinit var btnThemeAmber: MaterialButton
+    private lateinit var btnThemeGreen: MaterialButton
 
     private lateinit var tvLogs: TextView
     private lateinit var scrollLogs: ScrollView
     private lateinit var btnClearLogs: View
     private lateinit var btnCopyLogs: View
+    private lateinit var btnSendDiagnosticReport: View
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
-    private var currentVersionName = "1.9.8"
+    private var currentVersionName = "1.9.9b"
 
     private val customCombosList = mutableListOf<CustomCombo>()
 
@@ -131,14 +143,24 @@ class MainActivity : AppCompatActivity() {
         switchHaptic = findViewById(R.id.switchHaptic)
         switchProximity = findViewById(R.id.switchProximity)
         switchGlyph = findViewById(R.id.switchGlyph)
+        switchAlwaysActive = findViewById(R.id.switchAlwaysActive)
         switchTestMode = findViewById(R.id.switchTestMode)
         layoutWhitelistSelector = findViewById(R.id.layoutWhitelistSelector)
         tvWhitelistSummary = findViewById(R.id.tvWhitelistSummary)
+
+        btnRollbackVersion = findViewById(R.id.btnRollbackVersion)
+        tvCurrentThemeName = findViewById(R.id.tvCurrentThemeName)
+        btnThemeRed = findViewById(R.id.btnThemeRed)
+        btnThemeCyan = findViewById(R.id.btnThemeCyan)
+        btnThemeMono = findViewById(R.id.btnThemeMono)
+        btnThemeAmber = findViewById(R.id.btnThemeAmber)
+        btnThemeGreen = findViewById(R.id.btnThemeGreen)
 
         tvLogs = findViewById(R.id.tvLogs)
         scrollLogs = findViewById(R.id.scrollLogs)
         btnClearLogs = findViewById(R.id.btnClearLogs)
         btnCopyLogs = findViewById(R.id.btnCopyLogs)
+        btnSendDiagnosticReport = findViewById(R.id.btnSendDiagnosticReport)
 
         val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
 
@@ -173,6 +195,11 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+
+        // Discreet Rollback Version Button
+        btnRollbackVersion.setOnClickListener {
+            showRollbackDialog()
         }
 
         // Master Kill Switch
@@ -298,6 +325,16 @@ class MainActivity : AppCompatActivity() {
             LogBuffer.log("Proximity Guard: ${if (isChecked) "ENABLED" else "DISABLED"}")
         }
 
+        // Always-Active Switch (Gestures work anytime, even without active music playback)
+        val isAlwaysActive = prefs.getBoolean("always_active", true)
+        switchAlwaysActive.isChecked = isAlwaysActive
+        VolumeTweakService.alwaysActiveEnabled = isAlwaysActive
+        switchAlwaysActive.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("always_active", isChecked).apply()
+            VolumeTweakService.alwaysActiveEnabled = isChecked
+            LogBuffer.log("Always-Active mode: ${if (isChecked) "ENABLED (Gestures trigger anytime)" else "DISABLED (Music playback required)"}")
+        }
+
         // Test Mode Switch
         val isTestMode = prefs.getBoolean("test_mode", false)
         switchTestMode.isChecked = isTestMode
@@ -352,6 +389,14 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "No logs to copy", Toast.LENGTH_SHORT).show()
             }
         }
+
+        // Diagnostic Report Button
+        btnSendDiagnosticReport.setOnClickListener {
+            showDiagnosticReportDialog()
+        }
+
+        // Theme Customization Controls
+        setupThemeControls()
     }
 
     private fun renderCustomCombos() {
@@ -701,13 +746,12 @@ class MainActivity : AppCompatActivity() {
 
                 val presets = listOf(5, 10, 15, 20, 30, 45, 60, 90, 120)
                 for (p in presets) {
-                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                    val btn = MaterialButton(androidx.appcompat.view.ContextThemeWrapper(this, R.style.Widget_VolumeTweak_PresetChip)).apply {
                         text = "${p}s"
-                        textSize = 12f
+                        minWidth = (56 * dp).toInt()
+                        maxLines = 1
                         isSingleLine = true
-                        minWidth = 0
-                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
-                        setTextColor(Color.WHITE)
+                        ellipsize = null
                         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                             marginEnd = (8 * dp).toInt()
                         }
@@ -743,13 +787,12 @@ class MainActivity : AppCompatActivity() {
 
                 val presets = listOf(0, 10, 25, 35, 50, 65, 75, 85, 100)
                 for (p in presets) {
-                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                    val btn = MaterialButton(androidx.appcompat.view.ContextThemeWrapper(this, R.style.Widget_VolumeTweak_PresetChip)).apply {
                         text = "${p}%"
-                        textSize = 12f
+                        minWidth = (56 * dp).toInt()
+                        maxLines = 1
                         isSingleLine = true
-                        minWidth = 0
-                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
-                        setTextColor(Color.WHITE)
+                        ellipsize = null
                         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                             marginEnd = (8 * dp).toInt()
                         }
@@ -785,13 +828,12 @@ class MainActivity : AppCompatActivity() {
 
                 val presets = listOf(5, 10, 15, 20, 25, -5, -10, -15, -20, -25)
                 for (p in presets) {
-                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                    val btn = MaterialButton(androidx.appcompat.view.ContextThemeWrapper(this, R.style.Widget_VolumeTweak_PresetChip)).apply {
                         text = if (p >= 0) "+$p%" else "$p%"
-                        textSize = 12f
+                        minWidth = (56 * dp).toInt()
+                        maxLines = 1
                         isSingleLine = true
-                        minWidth = 0
-                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
-                        setTextColor(Color.WHITE)
+                        ellipsize = null
                         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                             marginEnd = (8 * dp).toInt()
                         }
@@ -827,13 +869,12 @@ class MainActivity : AppCompatActivity() {
 
                 val presets = listOf(1, 2, 3, 5, 10, 15, 20, 30, 45, 60)
                 for (p in presets) {
-                    val btn = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                    val btn = MaterialButton(androidx.appcompat.view.ContextThemeWrapper(this, R.style.Widget_VolumeTweak_PresetChip)).apply {
                         text = "${p}m"
-                        textSize = 12f
+                        minWidth = (56 * dp).toInt()
+                        maxLines = 1
                         isSingleLine = true
-                        minWidth = 0
-                        setPadding((12 * dp).toInt(), (6 * dp).toInt(), (12 * dp).toInt(), (6 * dp).toInt())
-                        setTextColor(Color.WHITE)
+                        ellipsize = null
                         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                             marginEnd = (8 * dp).toInt()
                         }
@@ -1151,6 +1192,161 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun setupThemeControls() {
+        val current = ThemeManager.getCurrentTheme(this)
+        updateThemeUI(current)
+
+        btnThemeRed.setOnClickListener { applyTheme(AppTheme.NOTHING_RED) }
+        btnThemeCyan.setOnClickListener { applyTheme(AppTheme.CYBER_CYAN) }
+        btnThemeMono.setOnClickListener { applyTheme(AppTheme.NOTHING_MONOCHROME) }
+        btnThemeAmber.setOnClickListener { applyTheme(AppTheme.AMBER_GLOW) }
+        btnThemeGreen.setOnClickListener { applyTheme(AppTheme.MATRIX_GREEN) }
+    }
+
+    private fun applyTheme(theme: AppTheme) {
+        ThemeManager.setTheme(this, theme)
+        updateThemeUI(theme)
+        LogBuffer.log("Theme selected: ${theme.displayName}")
+        Toast.makeText(this, "Theme set to ${theme.displayName}", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun updateThemeUI(theme: AppTheme) {
+        tvCurrentThemeName.text = "${theme.displayName} (${theme.subtitle})"
+        tvCurrentThemeName.setTextColor(theme.getPrimaryColor())
+
+        val themeButtons = listOf(
+            btnThemeRed to AppTheme.NOTHING_RED,
+            btnThemeCyan to AppTheme.CYBER_CYAN,
+            btnThemeMono to AppTheme.NOTHING_MONOCHROME,
+            btnThemeAmber to AppTheme.AMBER_GLOW,
+            btnThemeGreen to AppTheme.MATRIX_GREEN
+        )
+
+        for ((btn, t) in themeButtons) {
+            if (t == theme) {
+                btn.setBackgroundColor(t.getPrimaryColor())
+                btn.setTextColor(if (t == AppTheme.NOTHING_MONOCHROME) Color.BLACK else Color.WHITE)
+                btn.strokeWidth = 0
+            } else {
+                btn.setBackgroundColor(Color.parseColor("#141414"))
+                btn.setTextColor(Color.parseColor("#AAAAAA"))
+                btn.strokeColor = android.content.res.ColorStateList.valueOf(t.getPrimaryColor())
+                btn.strokeWidth = (1 * resources.displayMetrics.density).toInt()
+            }
+        }
+    }
+
+    private fun showRollbackDialog() {
+        val progressDialog = AlertDialog.Builder(this)
+            .setTitle("Release History")
+            .setMessage("Fetching releases from GitHub...")
+            .setCancelable(false)
+            .create()
+        progressDialog.show()
+
+        UpdateChecker.fetchReleaseHistory { releases, error ->
+            progressDialog.dismiss()
+            if (error != null || releases.isEmpty()) {
+                AlertDialog.Builder(this)
+                    .setTitle("Version Rollback")
+                    .setMessage(error ?: "No release history found on GitHub.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return@fetchReleaseHistory
+            }
+
+            val items = releases.map { rel ->
+                val dateStr = if (rel.publishedAt.length >= 10) " (${rel.publishedAt.substring(0, 10)})" else ""
+                "${rel.tag}$dateStr - ${rel.name}"
+            }.toTypedArray()
+
+            AlertDialog.Builder(this)
+                .setTitle("Select Version to Rollback")
+                .setItems(items) { _, which ->
+                    val chosen = releases[which]
+                    val apkUrl = chosen.apkUrl
+                    if (apkUrl.isNullOrBlank()) {
+                        Toast.makeText(this, "No APK asset found for ${chosen.tag}", Toast.LENGTH_SHORT).show()
+                        return@setItems
+                    }
+
+                    AlertDialog.Builder(this)
+                        .setTitle("Rollback to ${chosen.tag}")
+                        .setMessage("Download and install ${chosen.tag}?\n\nNotes:\n${chosen.body.take(250)}...")
+                        .setPositiveButton("Install ${chosen.tag}") { _, _ ->
+                            startInAppUpdate(apkUrl)
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }
+                .setNegativeButton("Close", null)
+                .show()
+        }
+    }
+
+    private fun showDiagnosticReportDialog() {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_diagnostic_report, null)
+        val btn1h = dialogView.findViewById<MaterialButton>(R.id.btnRange1h)
+        val btn5h = dialogView.findViewById<MaterialButton>(R.id.btnRange5h)
+        val btn24h = dialogView.findViewById<MaterialButton>(R.id.btnRange24h)
+        val btnAll = dialogView.findViewById<MaterialButton>(R.id.btnRangeAll)
+        val tvSummary = dialogView.findViewById<TextView>(R.id.tvReportLogSummary)
+        val etNote = dialogView.findViewById<EditText>(R.id.etDiagnosticNote)
+        val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnReportCancel)
+        val btnSend = dialogView.findViewById<MaterialButton>(R.id.btnReportSend)
+
+        var selectedHours: Int? = 24
+
+        fun updateRangeSelection(hours: Int?) {
+            selectedHours = hours
+            val activeColor = Color.parseColor("#D71921")
+            val inactiveColor = Color.parseColor("#1E1E1E")
+
+            btn1h.setBackgroundColor(if (hours == 1) activeColor else inactiveColor)
+            btn5h.setBackgroundColor(if (hours == 5) activeColor else inactiveColor)
+            btn24h.setBackgroundColor(if (hours == 24) activeColor else inactiveColor)
+            btnAll.setBackgroundColor(if (hours == null) activeColor else inactiveColor)
+
+            val count = LogBuffer.getLogsForTimeRange(hours).size
+            val timeLabel = when (hours) {
+                1 -> "past 1 hour"
+                5 -> "past 5 hours"
+                24 -> "past 24 hours"
+                else -> "all-day history"
+            }
+            tvSummary.text = "Found $count recorded events in $timeLabel."
+        }
+
+        updateRangeSelection(24)
+
+        btn1h.setOnClickListener { updateRangeSelection(1) }
+        btn5h.setOnClickListener { updateRangeSelection(5) }
+        btn24h.setOnClickListener { updateRangeSelection(24) }
+        btnAll.setOnClickListener { updateRangeSelection(null) }
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        btnCancel.setOnClickListener { dialog.dismiss() }
+
+        btnSend.setOnClickListener {
+            val userNote = etNote.text.toString().trim()
+            val reportText = LogBuffer.generateDiagnosticReport(this, selectedHours, userNote)
+
+            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "Volume Tweak - Diagnostic Report ($currentVersionName)")
+                putExtra(Intent.EXTRA_TEXT, reportText)
+            }
+            dialog.dismiss()
+            startActivity(Intent.createChooser(sendIntent, "Share Diagnostic Report"))
+            LogBuffer.log("Exported diagnostic report (${selectedHours ?: "All"}h)")
+        }
+
+        dialog.show()
     }
 
     override fun onResume() {

@@ -39,6 +39,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     private var lastVolDownReleaseTime: Long = 0
     private var isVolUpPressed = false
     private var isVolDownPressed = false
+    private var lastHardwareKeyEventTime: Long = 0
 
     // Deferral & Continuous Ramp
     private var pendingSinglePressRunnable: Runnable? = null
@@ -64,6 +65,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
     companion object {
         var isServiceSuspended: Boolean = false
+        var alwaysActiveEnabled: Boolean = true
         var testModeEnabled: Boolean = false
         var glyphReactionEnabled: Boolean = false
         var hapticReactionEnabled: Boolean = true
@@ -94,6 +96,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         fun reloadPreferences(context: Context) {
             val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
             isServiceSuspended = prefs.getBoolean("service_suspended", false)
+            alwaysActiveEnabled = prefs.getBoolean("always_active", true)
             glyphReactionEnabled = prefs.getBoolean("glyph_reaction", false)
             hapticReactionEnabled = prefs.getBoolean("haptic_feedback", true)
             proximitySensorEnabled = prefs.getBoolean("proximity_pocket_guard", false)
@@ -224,10 +227,26 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
     private fun isCallOrRingingActive(): Boolean {
         val mode = audioManager.mode
-        return mode == AudioManager.MODE_IN_CALL ||
+        val isModeCall = mode == AudioManager.MODE_IN_CALL ||
                mode == AudioManager.MODE_IN_COMMUNICATION ||
                mode == AudioManager.MODE_RINGTONE ||
                mode == AudioManager.MODE_CALL_SCREENING
+
+        val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+        val isInTelecomCall = try {
+            telecomManager?.isInCall == true
+        } catch (e: Exception) {
+            false
+        }
+
+        val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
+        val isTelephonyInCall = try {
+            telephonyManager?.callState != android.telephony.TelephonyManager.CALL_STATE_IDLE
+        } catch (e: Exception) {
+            false
+        }
+
+        return isModeCall || isInTelecomCall || isTelephonyInCall
     }
 
     override fun onKeyEvent(event: KeyEvent): Boolean {
@@ -246,11 +265,6 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             return false
         }
 
-        // Active Phone Call / VoIP / Ringing: Completely pass through so call volume works 100% natively
-        if (isCallOrRingingActive()) {
-            return super.onKeyEvent(event)
-        }
-
         val keyCode = event.keyCode
         val action = event.action
 
@@ -258,7 +272,29 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             return super.onKeyEvent(event)
         }
 
+        // Active Phone Call / VoIP / Ringing: Directly adjust call volume stream so call volume works 100% reliably
+        if (isCallOrRingingActive()) {
+            val direction = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
+            val targetStream = if (audioManager.mode == AudioManager.MODE_IN_COMMUNICATION || audioManager.mode == AudioManager.MODE_IN_CALL) {
+                AudioManager.STREAM_VOICE_CALL
+            } else if (audioManager.mode == AudioManager.MODE_RINGTONE) {
+                AudioManager.STREAM_RING
+            } else {
+                AudioManager.USE_DEFAULT_STREAM_TYPE
+            }
+            if (action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                audioManager.adjustStreamVolume(targetStream, direction, AudioManager.FLAG_SHOW_UI)
+            }
+            return super.onKeyEvent(event)
+        }
+
         val currentTime = SystemClock.uptimeMillis()
+        lastHardwareKeyEventTime = currentTime
+
+        // Filter OS key repeat events on ACTION_DOWN so repeat events do not corrupt sequence state
+        if (action == KeyEvent.ACTION_DOWN && event.repeatCount > 0) {
+            return true
+        }
 
         // Post-Action Cooldown: swallow any bouncing releases or trailing taps immediately following an executed gesture
         if (currentTime - lastActionExecuteTime < POST_ACTION_COOLDOWN_MS) {
@@ -272,7 +308,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         val isMusicActive = audioManager.isMusicActive
         val timeSinceLastAction = currentTime - lastTweakActionTime
         val isRecentPauseSession = timeSinceLastAction < pauseSessionTimeoutMs
-        val isEligibleMediaState = isMusicActive || isRecentPauseSession || testModeEnabled
+        val isEligibleMediaState = alwaysActiveEnabled || isMusicActive || isRecentPauseSession || testModeEnabled
 
         val passesWhitelist = isAppWhitelisted()
         val passesProximity = !proximitySensorEnabled || isProximityCovered
@@ -481,12 +517,15 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             override fun run() {
                 val now = SystemClock.uptimeMillis()
                 val isStillPressed = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolUpPressed else isVolDownPressed
-                val exceededMaxDuration = (now - rampStartTime) > 3500L
+                val exceededMaxDuration = (now - rampStartTime) > 3000L
+                val isKeyFresh = (now - lastHardwareKeyEventTime) < 300L
 
-                if (isStillPressed && !isDualPressActive && !isSequenceActive && !exceededMaxDuration) {
+                if (isStillPressed && !isDualPressActive && !isSequenceActive && !exceededMaxDuration && isKeyFresh) {
                     audioManager.adjustSuggestedStreamVolume(direction, AudioManager.USE_DEFAULT_STREAM_TYPE, AudioManager.FLAG_SHOW_UI)
                     handler.postDelayed(this, CONTINUOUS_RAMP_INTERVAL_MS)
                 } else {
+                    isVolUpPressed = false
+                    isVolDownPressed = false
                     cancelContinuousVolumeRamp()
                 }
             }
@@ -627,6 +666,20 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 val success = MediaNotificationListener.likeCurrentTrack(this)
                 HapticFeedbackController.vibrateTick(this)
                 LogBuffer.log("[ACTION] Like track (Success: $success)")
+            }
+
+            "CYCLE_PLAYBACK_SPEED" -> {
+                val newSpeed = MediaNotificationListener.cyclePlaybackSpeed(this)
+                HapticFeedbackController.vibrateTick(this)
+                audioPromptHelper.speak("Playback speed ${newSpeed}x")
+                LogBuffer.log("[ACTION] Cycle speed -> ${newSpeed}x")
+            }
+            "SAFE_VOLUME_CAP" -> {
+                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val safeVol = Math.round(maxVol * 0.75f)
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, safeVol, AudioManager.FLAG_SHOW_UI)
+                audioPromptHelper.speak("Ear protection active, volume capped at 75 percent")
+                LogBuffer.log("[ACTION] Safe volume cap applied: $safeVol/$maxVol")
             }
 
             "SET_VOLUME" -> {
@@ -778,6 +831,17 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                     startActivity(intent)
                 } catch (e: Exception) {
                     LogBuffer.log("Open camera error: ${e.message}")
+                }
+            }
+            "TOGGLE_VOICE_RECORDER" -> {
+                try {
+                    val intent = Intent(android.provider.MediaStore.Audio.Media.RECORD_SOUND_ACTION).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                    LogBuffer.log("[ACTION] Opened Voice Recorder")
+                } catch (e: Exception) {
+                    LogBuffer.log("[ACTION ERROR] Voice recorder launch: ${e.message}")
                 }
             }
             "TRIGGER_ALARM" -> {
