@@ -5,9 +5,11 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import java.io.File
+import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 data class LogEntry(val timestampMs: Long, val formattedTime: String, val message: String)
 
@@ -15,9 +17,10 @@ object LogBuffer {
     private val memoryLogs = mutableListOf<LogEntry>()
     private var listener: ((List<String>) -> Unit)? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val diskExecutor = Executors.newSingleThreadExecutor()
     private val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
     private val displayFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
-    private const val MAX_MEMORY_LOGS = 300
+    private const val MAX_MEMORY_LOGS = 50
     private var logFile: File? = null
     private var isInitialized = false
 
@@ -35,88 +38,144 @@ object LogBuffer {
     private fun loadLogsFromDisk() {
         val file = logFile ?: return
         if (!file.exists()) return
-        try {
-            val lines = file.readLines()
-            memoryLogs.clear()
-            val now = System.currentTimeMillis()
-            val cutoff = now - (48 * 3600 * 1000L) // Retain last 48 hours
+        diskExecutor.execute {
+            try {
+                val lines = file.readLines()
+                val now = System.currentTimeMillis()
+                val cutoff = now - (24 * 3600 * 1000L) // Retain last 24 hours on disk
 
-            for (line in lines) {
-                if (line.isBlank()) continue
-                val parts = line.split(" | ", limit = 3)
-                if (parts.size == 3) {
-                    val ts = parts[0].toLongOrNull() ?: continue
-                    if (ts >= cutoff) {
-                        memoryLogs.add(LogEntry(ts, parts[1], parts[2]))
+                val loaded = mutableListOf<LogEntry>()
+                for (line in lines) {
+                    if (line.isBlank()) continue
+                    val parts = line.split(" | ", limit = 3)
+                    if (parts.size == 3) {
+                        val ts = parts[0].toLongOrNull() ?: continue
+                        if (ts >= cutoff) {
+                            loaded.add(LogEntry(ts, parts[1], parts[2]))
+                        }
                     }
                 }
+
+                synchronized(memoryLogs) {
+                    memoryLogs.clear()
+                    memoryLogs.addAll(loaded.takeLast(MAX_MEMORY_LOGS))
+                }
+            } catch (e: Exception) {
+                // Ignore disk parse errors
             }
-        } catch (e: Exception) {
-            // Ignore disk parse errors
         }
     }
 
-    private fun saveLogsToDisk() {
+    private fun appendLogToDisk(entry: LogEntry) {
         val file = logFile ?: return
-        try {
-            val content = memoryLogs.joinToString("\n") { "${it.timestampMs} | ${it.formattedTime} | ${it.message}" }
-            file.writeText(content)
-        } catch (e: Exception) {
-            // Ignore disk write errors
+        diskExecutor.execute {
+            try {
+                FileWriter(file, true).use { writer ->
+                    writer.append("${entry.timestampMs} | ${entry.formattedTime} | ${entry.message}\n")
+                }
+            } catch (e: Exception) {
+                // Ignore disk write errors
+            }
         }
     }
 
-    @Synchronized
     fun log(message: String) {
         val now = System.currentTimeMillis()
         val timestampStr = timeFormat.format(Date(now))
         val entry = LogEntry(now, timestampStr, message)
-        memoryLogs.add(entry)
 
-        while (memoryLogs.size > MAX_MEMORY_LOGS) {
-            memoryLogs.removeAt(0)
+        var displayList: List<String>? = null
+        synchronized(memoryLogs) {
+            memoryLogs.add(entry)
+            while (memoryLogs.size > MAX_MEMORY_LOGS) {
+                memoryLogs.removeAt(0)
+            }
+            if (listener != null) {
+                displayList = memoryLogs.takeLast(25).map { "[${displayFormat.format(Date(it.timestampMs))}] ${it.message}" }
+            }
         }
 
-        saveLogsToDisk()
+        appendLogToDisk(entry)
 
-        val displayList = memoryLogs.takeLast(35).map { "[${displayFormat.format(Date(it.timestampMs))}] ${it.message}" }
-        mainHandler.post {
-            listener?.invoke(displayList)
+        if (displayList != null) {
+            mainHandler.post {
+                listener?.invoke(displayList!!)
+            }
+        }
+    }
+
+    fun trimMemory() {
+        synchronized(memoryLogs) {
+            if (memoryLogs.size > 20) {
+                val trimmed = memoryLogs.takeLast(20)
+                memoryLogs.clear()
+                memoryLogs.addAll(trimmed)
+            }
         }
     }
 
     @Synchronized
     fun getLogsForTimeRange(hoursAgo: Int?): List<LogEntry> {
-        if (hoursAgo == null || hoursAgo <= 0) return ArrayList(memoryLogs)
-        val cutoff = System.currentTimeMillis() - (hoursAgo * 3600 * 1000L)
-        return memoryLogs.filter { it.timestampMs >= cutoff }
+        val file = logFile
+        if (file != null && file.exists()) {
+            try {
+                val lines = file.readLines()
+                val cutoff = if (hoursAgo != null && hoursAgo > 0) System.currentTimeMillis() - (hoursAgo * 3600 * 1000L) else 0L
+                val results = mutableListOf<LogEntry>()
+                for (line in lines) {
+                    if (line.isBlank()) continue
+                    val parts = line.split(" | ", limit = 3)
+                    if (parts.size == 3) {
+                        val ts = parts[0].toLongOrNull() ?: continue
+                        if (ts >= cutoff) {
+                            results.add(LogEntry(ts, parts[1], parts[2]))
+                        }
+                    }
+                }
+                return results
+            } catch (e: Exception) {
+                // Fallback to memory
+            }
+        }
+        synchronized(memoryLogs) {
+            if (hoursAgo == null || hoursAgo <= 0) return ArrayList(memoryLogs)
+            val cutoff = System.currentTimeMillis() - (hoursAgo * 3600 * 1000L)
+            return memoryLogs.filter { it.timestampMs >= cutoff }
+        }
     }
 
     @Synchronized
     fun getAllLogsText(): String {
-        return memoryLogs.joinToString("\n") { "[${it.formattedTime}] ${it.message}" }
+        synchronized(memoryLogs) {
+            return memoryLogs.joinToString("\n") { "[${it.formattedTime}] ${it.message}" }
+        }
     }
 
     @Synchronized
     fun clear() {
-        memoryLogs.clear()
-        try {
-            logFile?.delete()
-        } catch (e: Exception) {
-            // Ignore delete error
+        synchronized(memoryLogs) {
+            memoryLogs.clear()
+        }
+        diskExecutor.execute {
+            try {
+                logFile?.delete()
+            } catch (e: Exception) {
+                // Ignore delete error
+            }
         }
         mainHandler.post {
-            listener?.invoke(ArrayList())
+            listener?.invoke(emptyList())
         }
     }
 
-    @Synchronized
     fun setListener(l: ((List<String>) -> Unit)?) {
-        listener = l
-        if (l != null) {
-            val displayList = memoryLogs.takeLast(35).map { "[${displayFormat.format(Date(it.timestampMs))}] ${it.message}" }
-            mainHandler.post {
-                l.invoke(displayList)
+        synchronized(memoryLogs) {
+            listener = l
+            if (l != null) {
+                val displayList = memoryLogs.takeLast(25).map { "[${displayFormat.format(Date(it.timestampMs))}] ${it.message}" }
+                mainHandler.post {
+                    l.invoke(displayList)
+                }
             }
         }
     }
@@ -132,7 +191,7 @@ object LogBuffer {
         sb.append("Device Hardware  : ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})\n")
         sb.append("Android Version  : Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n")
         sb.append("Build Display ID : ${Build.DISPLAY}\n")
-        sb.append("App Version      : v1.9.9b (Build 20)\n")
+        sb.append("App Version      : v1.9.10 (Build 21)\n")
         sb.append("Selected Window  : ${if (hoursAgo == null || hoursAgo <= 0) "All Available Logs" else "Past $hoursAgo Hour(s)"}\n")
         sb.append("Total Events     : ${filteredLogs.size}\n")
 
@@ -154,18 +213,8 @@ object LogBuffer {
             }
         }
         sb.append("====================================================\n")
-        sb.append("End of Diagnostic Report\n")
-
-        val reportStr = sb.toString()
-
-        // Also persist report to disk locally for easy retrieval
-        try {
-            val reportFile = File(context.filesDir, "latest_diagnostic_report.txt")
-            reportFile.writeText(reportStr)
-        } catch (e: Exception) {
-            // Ignore file write error
-        }
-
-        return reportStr
+        sb.append("                  END OF REPORT                     \n")
+        sb.append("====================================================\n")
+        return sb.toString()
     }
 }

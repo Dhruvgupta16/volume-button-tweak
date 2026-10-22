@@ -31,9 +31,18 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.materialswitch.MaterialSwitch
 
 class MainActivity : AppCompatActivity() {
+
+    private lateinit var rootScrollView: ScrollView
+    private lateinit var cardHeader: MaterialCardView
+    private lateinit var cardMaster: MaterialCardView
+    private lateinit var cardThemes: MaterialCardView
+    private lateinit var cardGestures: MaterialCardView
+    private lateinit var cardConsole: MaterialCardView
+    private lateinit var tvThemeCardTitle: TextView
 
     private lateinit var tvStatus: TextView
     private lateinit var tvNotificationStatus: TextView
@@ -74,6 +83,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var switchProximity: MaterialSwitch
     private lateinit var switchGlyph: MaterialSwitch
     private lateinit var switchAlwaysActive: MaterialSwitch
+    private lateinit var switchNativePassthrough: MaterialSwitch
     private lateinit var switchTestMode: MaterialSwitch
     private lateinit var layoutWhitelistSelector: View
     private lateinit var tvWhitelistSummary: TextView
@@ -85,6 +95,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnThemeMono: MaterialButton
     private lateinit var btnThemeAmber: MaterialButton
     private lateinit var btnThemeGreen: MaterialButton
+    private lateinit var btnThemeViolet: MaterialButton
+    private lateinit var btnThemeCoral: MaterialButton
+    private lateinit var btnThemeFrost: MaterialButton
 
     private lateinit var tvLogs: TextView
     private lateinit var scrollLogs: ScrollView
@@ -105,6 +118,14 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         // Bind Views
+        rootScrollView = findViewById(R.id.rootScrollView)
+        cardHeader = findViewById(R.id.cardHeader)
+        cardMaster = findViewById(R.id.cardMaster)
+        cardThemes = findViewById(R.id.cardThemes)
+        cardGestures = findViewById(R.id.cardGestures)
+        cardConsole = findViewById(R.id.cardConsole)
+        tvThemeCardTitle = findViewById(R.id.tvThemeCardTitle)
+
         tvStatus = findViewById(R.id.tvStatus)
         tvNotificationStatus = findViewById(R.id.tvNotificationStatus)
         tvAppVersion = findViewById(R.id.tvAppVersion)
@@ -144,6 +165,7 @@ class MainActivity : AppCompatActivity() {
         switchProximity = findViewById(R.id.switchProximity)
         switchGlyph = findViewById(R.id.switchGlyph)
         switchAlwaysActive = findViewById(R.id.switchAlwaysActive)
+        switchNativePassthrough = findViewById(R.id.switchNativePassthrough)
         switchTestMode = findViewById(R.id.switchTestMode)
         layoutWhitelistSelector = findViewById(R.id.layoutWhitelistSelector)
         tvWhitelistSummary = findViewById(R.id.tvWhitelistSummary)
@@ -155,6 +177,9 @@ class MainActivity : AppCompatActivity() {
         btnThemeMono = findViewById(R.id.btnThemeMono)
         btnThemeAmber = findViewById(R.id.btnThemeAmber)
         btnThemeGreen = findViewById(R.id.btnThemeGreen)
+        btnThemeViolet = findViewById(R.id.btnThemeViolet)
+        btnThemeCoral = findViewById(R.id.btnThemeCoral)
+        btnThemeFrost = findViewById(R.id.btnThemeFrost)
 
         tvLogs = findViewById(R.id.tvLogs)
         scrollLogs = findViewById(R.id.scrollLogs)
@@ -333,6 +358,16 @@ class MainActivity : AppCompatActivity() {
             prefs.edit().putBoolean("always_active", isChecked).apply()
             VolumeTweakService.alwaysActiveEnabled = isChecked
             LogBuffer.log("Always-Active mode: ${if (isChecked) "ENABLED (Gestures trigger anytime)" else "DISABLED (Music playback required)"}")
+        }
+
+        // Native Pass-Through Switch (Instant screenshot & fast volume ramping)
+        val isNativePassthrough = prefs.getBoolean("native_volume_passthrough", true)
+        switchNativePassthrough.isChecked = isNativePassthrough
+        VolumeTweakService.nativeVolumePassthrough = isNativePassthrough
+        switchNativePassthrough.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("native_volume_passthrough", isChecked).apply()
+            VolumeTweakService.nativeVolumePassthrough = isChecked
+            LogBuffer.log("Native Pass-Through mode: ${if (isChecked) "ENABLED (Instant Screenshot & Fast Ramping)" else "DISABLED (Deferred mode)"}")
         }
 
         // Test Mode Switch
@@ -1203,25 +1238,49 @@ class MainActivity : AppCompatActivity() {
         btnThemeMono.setOnClickListener { applyTheme(AppTheme.NOTHING_MONOCHROME) }
         btnThemeAmber.setOnClickListener { applyTheme(AppTheme.AMBER_GLOW) }
         btnThemeGreen.setOnClickListener { applyTheme(AppTheme.MATRIX_GREEN) }
+        btnThemeViolet.setOnClickListener { applyTheme(AppTheme.NEON_VIOLET) }
+        btnThemeCoral.setOnClickListener { applyTheme(AppTheme.SUNSET_CORAL) }
+        btnThemeFrost.setOnClickListener { applyTheme(AppTheme.NORDIC_FROST) }
     }
 
     private fun applyTheme(theme: AppTheme) {
         ThemeManager.setTheme(this, theme)
         updateThemeUI(theme)
-        LogBuffer.log("Theme selected: ${theme.displayName}")
-        Toast.makeText(this, "Theme set to ${theme.displayName}", Toast.LENGTH_SHORT).show()
+        LogBuffer.log("Theme active: ${theme.displayName}")
+        Toast.makeText(this, "${theme.displayName} Applied", Toast.LENGTH_SHORT).show()
     }
 
     private fun updateThemeUI(theme: AppTheme) {
         tvCurrentThemeName.text = "${theme.displayName} (${theme.subtitle})"
         tvCurrentThemeName.setTextColor(theme.getPrimaryColor())
 
+        // 1. Root & Window Theming
+        rootScrollView.setBackgroundColor(theme.getRootBgColor())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.statusBarColor = theme.getRootBgColor()
+            window.navigationBarColor = theme.getRootBgColor()
+        }
+
+        // 2. Dynamic Card Surface & Stroke Theming
+        val allCards = listOf(cardHeader, cardMaster, cardThemes, cardGestures, cardConsole)
+        val strokeColor = theme.getStrokeColor()
+        val cardBgState = android.content.res.ColorStateList.valueOf(theme.getCardBgColor())
+
+        for (card in allCards) {
+            card.setCardBackgroundColor(cardBgState)
+            card.strokeColor = strokeColor
+        }
+
+        // 3. Theme Pill Buttons
         val themeButtons = listOf(
             btnThemeRed to AppTheme.NOTHING_RED,
             btnThemeCyan to AppTheme.CYBER_CYAN,
             btnThemeMono to AppTheme.NOTHING_MONOCHROME,
             btnThemeAmber to AppTheme.AMBER_GLOW,
-            btnThemeGreen to AppTheme.MATRIX_GREEN
+            btnThemeGreen to AppTheme.MATRIX_GREEN,
+            btnThemeViolet to AppTheme.NEON_VIOLET,
+            btnThemeCoral to AppTheme.SUNSET_CORAL,
+            btnThemeFrost to AppTheme.NORDIC_FROST
         )
 
         for ((btn, t) in themeButtons) {
@@ -1374,6 +1433,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
+        LogBuffer.trimMemory()
         if (level >= TRIM_MEMORY_UI_HIDDEN) {
             System.gc()
         }
@@ -1384,7 +1444,7 @@ class MainActivity : AppCompatActivity() {
             override fun run() {
                 val stats = PerformanceMonitor.getMemoryStats()
                 val cpuStr = PerformanceMonitor.getCpuUsagePercent()
-                tvRamUsage.text = String.format("Heap: %.1f MB (PSS: %.0fM)", stats.appHeapMb, stats.pssMb)
+                tvRamUsage.text = String.format("Heap: %.1f MB (Alloc: %.1fM)", stats.appHeapMb, stats.totalAllocatedMb)
                 tvCpuUsage.text = "CPU: $cpuStr"
                 monitorHandler.postDelayed(this, 3500)
             }

@@ -8,6 +8,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.hardware.camera2.CameraManager
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.AudioPlaybackConfiguration
@@ -32,6 +33,12 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
     private lateinit var audioPromptHelper: AudioPromptHelper
 
+    // Camera Hardware & Shutter Interception Guard
+    private var cameraManager: CameraManager? = null
+    private var isCameraHardwareInUse = false
+    private var currentForegroundPackage: String? = null
+    private var cameraCallback: CameraManager.AvailabilityCallback? = null
+
     // Button Physical State
     private var lastVolUpTime: Long = 0
     private var lastVolDownTime: Long = 0
@@ -40,6 +47,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     private var isVolUpPressed = false
     private var isVolDownPressed = false
     private var lastHardwareKeyEventTime: Long = 0
+    private var lastRepeatVolumeStepTime: Long = 0
 
     // Deferral & Continuous Ramp
     private var pendingSinglePressRunnable: Runnable? = null
@@ -66,6 +74,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     companion object {
         var isServiceSuspended: Boolean = false
         var alwaysActiveEnabled: Boolean = true
+        var nativeVolumePassthrough: Boolean = true
         var testModeEnabled: Boolean = false
         var glyphReactionEnabled: Boolean = false
         var hapticReactionEnabled: Boolean = true
@@ -97,6 +106,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             val prefs = context.getSharedPreferences("prefs", Context.MODE_PRIVATE)
             isServiceSuspended = prefs.getBoolean("service_suspended", false)
             alwaysActiveEnabled = prefs.getBoolean("always_active", true)
+            nativeVolumePassthrough = prefs.getBoolean("native_volume_passthrough", true)
             glyphReactionEnabled = prefs.getBoolean("glyph_reaction", false)
             hapticReactionEnabled = prefs.getBoolean("haptic_feedback", true)
             proximitySensorEnabled = prefs.getBoolean("proximity_pocket_guard", false)
@@ -129,8 +139,43 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
         reloadPreferences(this)
         initProximitySensor()
+        initCameraMonitoring()
         registerAudioPlaybackMonitoring()
         LogBuffer.log("Universal Sequence Service created and ready")
+    }
+
+    private fun initCameraMonitoring() {
+        try {
+            cameraManager = getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                val cb = object : CameraManager.AvailabilityCallback() {
+                    override fun onCameraUnavailable(cameraId: String) {
+                        super.onCameraUnavailable(cameraId)
+                        isCameraHardwareInUse = true
+                        LogBuffer.log("[CAMERA] Active (ID $cameraId) - Camera shutter passthrough active")
+                    }
+
+                    override fun onCameraAvailable(cameraId: String) {
+                        super.onCameraAvailable(cameraId)
+                        isCameraHardwareInUse = false
+                    }
+                }
+                cameraCallback = cb
+                cameraManager?.registerAvailabilityCallback(cb, handler)
+            }
+        } catch (e: Exception) {
+            LogBuffer.log("[CAMERA] Monitor note: ${e.message}")
+        }
+    }
+
+    private fun isCameraActive(): Boolean {
+        if (isCameraHardwareInUse) return true
+        val pkg = currentForegroundPackage?.lowercase() ?: ""
+        return pkg.contains("camera") ||
+                pkg.contains("cam") ||
+                pkg == "com.nothing.camera" ||
+                pkg == "com.google.android.googlecamera" ||
+                pkg == "net.sourceforge.opencamera"
     }
 
     private fun initProximitySensor() {
@@ -219,10 +264,24 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         }
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event == null) return
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val pkg = event.packageName?.toString()
+            if (pkg != null) {
+                currentForegroundPackage = pkg
+            }
+            if (!isDualPressActive && !isSequenceActive) {
+                isVolUpPressed = false
+                isVolDownPressed = false
+            }
+        }
+    }
 
     override fun onInterrupt() {
         LogBuffer.log("Service interrupted")
+        isVolUpPressed = false
+        isVolDownPressed = false
     }
 
     private fun isCallOrRingingActive(): Boolean {
@@ -272,6 +331,11 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             return super.onKeyEvent(event)
         }
 
+        // Camera Active Detection: Physical volume keys must natively trigger camera shutter!
+        if (isCameraActive()) {
+            return super.onKeyEvent(event)
+        }
+
         // Active Phone Call / VoIP / Ringing: Directly adjust call volume stream so call volume works 100% reliably
         if (isCallOrRingingActive()) {
             val direction = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER
@@ -290,11 +354,6 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
         val currentTime = SystemClock.uptimeMillis()
         lastHardwareKeyEventTime = currentTime
-
-        // Filter OS key repeat events on ACTION_DOWN so repeat events do not corrupt sequence state
-        if (action == KeyEvent.ACTION_DOWN && event.repeatCount > 0) {
-            return true
-        }
 
         // Post-Action Cooldown: swallow any bouncing releases or trailing taps immediately following an executed gesture
         if (currentTime - lastActionExecuteTime < POST_ACTION_COOLDOWN_MS) {
@@ -373,6 +432,12 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 isDualTokenEmitted = false
                 isHoldTriggered = false
 
+                // Compensate the 1-step volume change if native passthrough was used
+                if (nativeVolumePassthrough) {
+                    val compDir = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) AudioManager.ADJUST_LOWER else AudioManager.ADJUST_RAISE
+                    audioManager.adjustSuggestedStreamVolume(compDir, AudioManager.USE_DEFAULT_STREAM_TYPE, 0)
+                }
+
                 // Start Dual Hold Timer (500ms) only if both keys are physically down
                 if (isVolUpPressed && isVolDownPressed) {
                     activeHoldRunnable = Runnable {
@@ -408,20 +473,37 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 return true
             }
 
-            // 3. Normal Volume Button Press (Sequence inactive): Defer to check for potential dual press
-            if (continuousRampRunnable != null) {
+            // 3. Normal Volume Button Handling
+            if (nativeVolumePassthrough) {
+                // Pass single keys directly through to Android input pipeline:
+                // - Instant Power + Vol Down Screenshot (zero delay, zero volume bar in screenshot)
+                // - Native continuous volume hold/ramping at hardware speed
+                // - Smooth OEM volume animations
+                return super.onKeyEvent(event)
+            } else {
+                // Deferred Mode with Hold Support
+                if (event.repeatCount > 0) {
+                    if (currentTime - lastRepeatVolumeStepTime >= 100L) {
+                        adjustVolume(keyCode)
+                        lastRepeatVolumeStepTime = currentTime
+                    }
+                    return true
+                }
+
+                if (continuousRampRunnable != null) {
+                    return true
+                }
+
+                // If user taps the SAME button rapidly, flush previous pending press immediately
+                if (pendingSinglePressRunnable != null && pendingSinglePressKeyCode == keyCode) {
+                    adjustVolume(keyCode)
+                    cancelPendingSinglePress()
+                }
+
+                cancelPendingSinglePress()
+                scheduleDeferredSinglePress(keyCode)
                 return true
             }
-
-            // If user taps the SAME button rapidly, flush the previous pending press immediately
-            if (pendingSinglePressRunnable != null && pendingSinglePressKeyCode == keyCode) {
-                adjustVolume(keyCode)
-                cancelPendingSinglePress()
-            }
-
-            cancelPendingSinglePress()
-            scheduleDeferredSinglePress(keyCode)
-            return true
 
         } else if (action == KeyEvent.ACTION_UP) {
             val wasVolUp = (keyCode == KeyEvent.KEYCODE_VOLUME_UP)
@@ -469,8 +551,11 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 return true
             }
 
-            // 3. Normal Volume Key Release: Stop continuous ramp
+            // 3. Normal Volume Key Release
             cancelContinuousVolumeRamp()
+            if (nativeVolumePassthrough) {
+                return super.onKeyEvent(event)
+            }
             return true
         }
 
@@ -517,10 +602,9 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             override fun run() {
                 val now = SystemClock.uptimeMillis()
                 val isStillPressed = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolUpPressed else isVolDownPressed
-                val exceededMaxDuration = (now - rampStartTime) > 3000L
-                val isKeyFresh = (now - lastHardwareKeyEventTime) < 300L
+                val exceededMaxDuration = (now - rampStartTime) > 3500L
 
-                if (isStillPressed && !isDualPressActive && !isSequenceActive && !exceededMaxDuration && isKeyFresh) {
+                if (isStillPressed && !isDualPressActive && !isSequenceActive && !exceededMaxDuration) {
                     audioManager.adjustSuggestedStreamVolume(direction, AudioManager.USE_DEFAULT_STREAM_TYPE, AudioManager.FLAG_SHOW_UI)
                     handler.postDelayed(this, CONTINUOUS_RAMP_INTERVAL_MS)
                 } else {
@@ -530,7 +614,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 }
             }
         }
-        handler.postDelayed(continuousRampRunnable!!, INITIAL_HOLD_RAMP_DELAY_MS)
+        handler.postDelayed(continuousRampRunnable!!, 100L)
     }
 
     private fun cancelContinuousVolumeRamp() {
@@ -966,6 +1050,9 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         sensorManager?.unregisterListener(this)
+        try {
+            cameraCallback?.let { cameraManager?.unregisterAvailabilityCallback(it) }
+        } catch (ignored: Exception) {}
         audioPromptHelper.shutdown()
         wakeLock?.let {
             if (it.isHeld) it.release()

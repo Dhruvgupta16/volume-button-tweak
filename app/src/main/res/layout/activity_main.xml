@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootScrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000"
@@ -14,6 +15,7 @@
 
         <!-- Header Card: Title, Nothing Dot Logo, Version, Update Button -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:cardBackgroundColor="#0D0D0D"
@@ -218,6 +220,7 @@
 
         <!-- Master Kill / Suspend Switch Widget -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardMaster"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
@@ -396,8 +399,153 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- Interface Theme Selection Card (Prominent Top Position) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardThemes"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            app:cardBackgroundColor="#0D0D0D"
+            app:cardCornerRadius="18dp"
+            app:strokeColor="#1F1F1F"
+            app:strokeWidth="1dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvThemeCardTitle"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="INTERFACE THEME"
+                            android:textColor="#FFFFFF"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="0.06" />
+
+                        <TextView
+                            android:id="@+id/tvCurrentThemeName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Nothing Crimson Red (Default)"
+                            android:textColor="#D71921"
+                            android:textSize="11sp"
+                            android:layout_marginTop="2dp" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <!-- Horizontal scrollable theme pills with 8 diverse options -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/containerThemeChips"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeRed"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:text="Crimson"
+                            app:strokeColor="#D71921"
+                            android:textColor="#FFFFFF" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeCyan"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:text="Cyber Cyan"
+                            app:strokeColor="#00E5FF"
+                            android:textColor="#E0E0E0" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeMono"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:text="Monochrome"
+                            app:strokeColor="#FFFFFF"
+                            android:textColor="#E0E0E0" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeAmber"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:text="Amber Glow"
+                            app:strokeColor="#FF9100"
+                            android:textColor="#E0E0E0" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeGreen"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:text="Matrix Green"
+                            app:strokeColor="#00E676"
+                            android:textColor="#E0E0E0" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeViolet"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:text="Neon Violet"
+                            app:strokeColor="#B388FF"
+                            android:textColor="#E0E0E0" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeCoral"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:text="Sunset Coral"
+                            app:strokeColor="#FF5722"
+                            android:textColor="#E0E0E0" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnThemeFrost"
+                            style="@style/Widget.VolumeTweak.PresetChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="36dp"
+                            android:layout_marginStart="8dp"
+                            android:text="Nordic Frost"
+                            app:strokeColor="#40C4FF"
+                            android:textColor="#E0E0E0" />
+                    </LinearLayout>
+                </HorizontalScrollView>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Gesture Customization & Modding Card -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardGestures"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
@@ -1140,6 +1288,67 @@
                     android:background="#181818"
                     android:layout_marginVertical="8dp" />
 
+                <!-- Native Pass-Through / Fast Screenshot Mode Switch -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <FrameLayout
+                        android:id="@+id/iconNativePassthrough"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:background="@drawable/bg_icon_circle">
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_gravity="center"
+                            app:srcCompat="@drawable/ph_sliders"
+                            app:tint="#FFFFFF" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_toEndOf="@id/iconNativePassthrough"
+                        android:layout_toStartOf="@id/switchNativePassthrough"
+                        android:layout_centerVertical="true"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Instant Screenshot &amp; Fast Ramping"
+                            android:textColor="#E0E0E0"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Native pass-through: Instant Power+Vol screenshot &amp; hardware hold volume ramp"
+                            android:textColor="#666666"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchNativePassthrough"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:checked="true" />
+                </RelativeLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#181818"
+                    android:layout_marginVertical="8dp" />
+
                 <!-- Test Mode Switch -->
                 <RelativeLayout
                     android:layout_width="match_parent"
@@ -1259,139 +1468,9 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Theme Customization Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/cardThemes"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            app:cardBackgroundColor="#0D0D0D"
-            app:cardCornerRadius="18dp"
-            app:strokeColor="#1F1F1F"
-            app:strokeWidth="1dp"
-            app:cardElevation="0dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <RelativeLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
-
-                    <FrameLayout
-                        android:id="@+id/iconThemePalette"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:layout_alignParentStart="true"
-                        android:layout_centerVertical="true"
-                        android:background="@drawable/bg_icon_circle">
-
-                        <ImageView
-                            android:layout_width="18dp"
-                            android:layout_height="18dp"
-                            android:layout_gravity="center"
-                            app:srcCompat="@drawable/ph_palette"
-                            app:tint="#FFFFFF" />
-                    </FrameLayout>
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:layout_toEndOf="@id/iconThemePalette"
-                        android:layout_centerVertical="true"
-                        android:layout_marginStart="12dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="INTERFACE THEME"
-                            android:textColor="#FFFFFF"
-                            android:textSize="12.5sp"
-                            android:textStyle="bold"
-                            android:letterSpacing="0.06" />
-
-                        <TextView
-                            android:id="@+id/tvCurrentThemeName"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Nothing Crimson Red (Default)"
-                            android:textColor="#7A7A7A"
-                            android:textSize="11sp"
-                            android:layout_marginTop="2dp" />
-                    </LinearLayout>
-                </RelativeLayout>
-
-                <!-- Horizontal scrollable theme pills -->
-                <HorizontalScrollView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:scrollbars="none">
-
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnThemeRed"
-                            style="@style/Widget.VolumeTweak.PresetChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:text="Crimson"
-                            app:strokeColor="#D71921"
-                            android:textColor="#FFFFFF" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnThemeCyan"
-                            style="@style/Widget.VolumeTweak.PresetChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:layout_marginStart="8dp"
-                            android:text="Cyber Cyan"
-                            app:strokeColor="#00E5FF"
-                            android:textColor="#E0E0E0" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnThemeMono"
-                            style="@style/Widget.VolumeTweak.PresetChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:layout_marginStart="8dp"
-                            android:text="Monochrome"
-                            app:strokeColor="#FFFFFF"
-                            android:textColor="#E0E0E0" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnThemeAmber"
-                            style="@style/Widget.VolumeTweak.PresetChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:layout_marginStart="8dp"
-                            android:text="Amber Glow"
-                            app:strokeColor="#FF9100"
-                            android:textColor="#E0E0E0" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnThemeGreen"
-                            style="@style/Widget.VolumeTweak.PresetChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:layout_marginStart="8dp"
-                            android:text="Matrix Green"
-                            app:strokeColor="#00E676"
-                            android:textColor="#E0E0E0" />
-                    </LinearLayout>
-                </HorizontalScrollView>
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
         <!-- Real-time Console Log Card -->
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardConsole"
             android:layout_width="match_parent"
             android:layout_height="230dp"
             android:layout_marginTop="12dp"

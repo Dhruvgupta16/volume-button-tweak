@@ -8,6 +8,7 @@ enum class AppTheme(
     val displayName: String,
     val primaryColorHex: String,
     val secondaryColorHex: String,
+    val rootBgHex: String,
     val cardBgHex: String,
     val strokeColorHex: String,
     val subtitle: String
@@ -17,8 +18,9 @@ enum class AppTheme(
         displayName = "Crimson Red",
         primaryColorHex = "#D71921",
         secondaryColorHex = "#FF4444",
+        rootBgHex = "#000000",
         cardBgHex = "#0D0D0D",
-        strokeColorHex = "#1F1F1F",
+        strokeColorHex = "#261616",
         subtitle = "Nothing OS Signature Style"
     ),
     CYBER_CYAN(
@@ -26,8 +28,9 @@ enum class AppTheme(
         displayName = "Electric Cyan",
         primaryColorHex = "#00E5FF",
         secondaryColorHex = "#18FFFF",
-        cardBgHex = "#0A1012",
-        strokeColorHex = "#16282E",
+        rootBgHex = "#04080B",
+        cardBgHex = "#0A1318",
+        strokeColorHex = "#12303A",
         subtitle = "Cyberpunk High Contrast"
     ),
     NOTHING_MONOCHROME(
@@ -35,8 +38,9 @@ enum class AppTheme(
         displayName = "Monochrome",
         primaryColorHex = "#FFFFFF",
         secondaryColorHex = "#CCCCCC",
-        cardBgHex = "#111111",
-        strokeColorHex = "#282828",
+        rootBgHex = "#000000",
+        cardBgHex = "#121212",
+        strokeColorHex = "#2C2C2C",
         subtitle = "Pure Minimalist White"
     ),
     AMBER_GLOW(
@@ -44,8 +48,9 @@ enum class AppTheme(
         displayName = "Amber Glow",
         primaryColorHex = "#FF9100",
         secondaryColorHex = "#FFA726",
-        cardBgHex = "#100E0A",
-        strokeColorHex = "#2E2010",
+        rootBgHex = "#080604",
+        cardBgHex = "#14100A",
+        strokeColorHex = "#332210",
         subtitle = "Vintage Braun Warmth"
     ),
     MATRIX_GREEN(
@@ -53,13 +58,45 @@ enum class AppTheme(
         displayName = "Matrix Green",
         primaryColorHex = "#00E676",
         secondaryColorHex = "#69F0AE",
-        cardBgHex = "#0A120D",
-        strokeColorHex = "#142A1A",
+        rootBgHex = "#030A05",
+        cardBgHex = "#0A140D",
+        strokeColorHex = "#13351C",
         subtitle = "Phosphor Hacker Terminal"
+    ),
+    NEON_VIOLET(
+        id = "neon_violet",
+        displayName = "Neon Violet",
+        primaryColorHex = "#B388FF",
+        secondaryColorHex = "#D1C4E9",
+        rootBgHex = "#08040C",
+        cardBgHex = "#120B1C",
+        strokeColorHex = "#2B1642",
+        subtitle = "Cyber Tokyo Synthwave"
+    ),
+    SUNSET_CORAL(
+        id = "sunset_coral",
+        displayName = "Sunset Coral",
+        primaryColorHex = "#FF5722",
+        secondaryColorHex = "#FF8A65",
+        rootBgHex = "#0A0504",
+        cardBgHex = "#170C0A",
+        strokeColorHex = "#3D1A15",
+        subtitle = "Solar Flare High Energy"
+    ),
+    NORDIC_FROST(
+        id = "nordic_frost",
+        displayName = "Nordic Frost",
+        primaryColorHex = "#40C4FF",
+        secondaryColorHex = "#80D8FF",
+        rootBgHex = "#05090F",
+        cardBgHex = "#0B1522",
+        strokeColorHex = "#182F4D",
+        subtitle = "Arctic Glacier Deep Blue"
     );
 
     fun getPrimaryColor(): Int = Color.parseColor(primaryColorHex)
     fun getSecondaryColor(): Int = Color.parseColor(secondaryColorHex)
+    fun getRootBgColor(): Int = Color.parseColor(rootBgHex)
     fun getCardBgColor(): Int = Color.parseColor(cardBgHex)
     fun getStrokeColor(): Int = Color.parseColor(strokeColorHex)
 }

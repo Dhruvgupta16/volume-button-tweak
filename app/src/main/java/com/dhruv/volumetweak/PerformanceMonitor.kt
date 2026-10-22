@@ -1,6 +1,5 @@
 package com.dhruv.volumetweak
 
-import android.content.Context
 import android.os.Debug
 import android.os.Process
 import android.os.SystemClock
@@ -18,20 +17,21 @@ object PerformanceMonitor {
 
     data class MemoryStats(
         val appHeapMb: Float,
-        val pssMb: Float
+        val totalAllocatedMb: Float
     )
 
     fun getMemoryStats(): MemoryStats {
         return try {
             val rt = Runtime.getRuntime()
-            val heapMb = (rt.totalMemory() - rt.freeMemory()) / (1024f * 1024f)
-            val pssMb = Debug.getPss() / 1024f
+            val heapUsedMb = (rt.totalMemory() - rt.freeMemory()) / (1024f * 1024f)
+            val nativeUsedMb = Debug.getNativeHeapAllocatedSize() / (1024f * 1024f)
+            val totalMb = heapUsedMb + nativeUsedMb
             MemoryStats(
-                appHeapMb = heapMb.coerceAtLeast(0.1f),
-                pssMb = pssMb.coerceAtLeast(heapMb)
+                appHeapMb = heapUsedMb.coerceAtLeast(0.1f),
+                totalAllocatedMb = totalMb.coerceAtLeast(heapUsedMb)
             )
         } catch (e: Exception) {
-            MemoryStats(3.2f, 8.5f)
+            MemoryStats(2.1f, 3.4f)
         }
     }
 
