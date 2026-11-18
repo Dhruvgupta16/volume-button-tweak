@@ -194,7 +194,9 @@ object LogBuffer {
         var appVer = "v1.9.12"
         try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            appVer = "v${pInfo.versionName} (Build ${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pInfo.longVersionCode else @Suppress("DEPRECATION") pInfo.versionCode})"
+            @Suppress("DEPRECATION")
+            val vCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pInfo.longVersionCode else pInfo.versionCode.toLong()
+            appVer = "v${pInfo.versionName} (Build $vCode)"
         } catch (ignored: Exception) {}
         sb.append("App Version      : $appVer\n")
         sb.append("Selected Window  : ${if (hoursAgo == null || hoursAgo <= 0) "All Available Logs" else "Past $hoursAgo Hour(s)"}\n")

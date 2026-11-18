@@ -179,12 +179,13 @@ object CloudLogger {
         try {
             val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
             versionName = pInfo.versionName ?: "Unknown"
-            versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            @Suppress("DEPRECATION")
+            val vCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 pInfo.longVersionCode
             } else {
-                @Suppress("DEPRECATION")
                 pInfo.versionCode.toLong()
             }
+            versionCode = vCode
         } catch (ignored: Exception) {}
 
         val sb = StringBuilder()
