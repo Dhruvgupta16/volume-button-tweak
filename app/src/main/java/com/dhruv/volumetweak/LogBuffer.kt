@@ -191,7 +191,12 @@ object LogBuffer {
         sb.append("Device Hardware  : ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})\n")
         sb.append("Android Version  : Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n")
         sb.append("Build Display ID : ${Build.DISPLAY}\n")
-        sb.append("App Version      : v1.9.10 (Build 21)\n")
+        var appVer = "v1.9.12"
+        try {
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            appVer = "v${pInfo.versionName} (Build ${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pInfo.longVersionCode else @Suppress("DEPRECATION") pInfo.versionCode})"
+        } catch (ignored: Exception) {}
+        sb.append("App Version      : $appVer\n")
         sb.append("Selected Window  : ${if (hoursAgo == null || hoursAgo <= 0) "All Available Logs" else "Past $hoursAgo Hour(s)"}\n")
         sb.append("Total Events     : ${filteredLogs.size}\n")
 

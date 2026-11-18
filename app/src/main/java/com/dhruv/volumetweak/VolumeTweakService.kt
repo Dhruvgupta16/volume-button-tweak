@@ -39,15 +39,22 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
     private var currentForegroundPackage: String? = null
     private var cameraCallback: CameraManager.AvailabilityCallback? = null
 
-    // Button Physical State
+    // Button Physical State & System Passthrough Tracking
     private var lastVolUpTime: Long = 0
     private var lastVolDownTime: Long = 0
     private var lastVolUpReleaseTime: Long = 0
     private var lastVolDownReleaseTime: Long = 0
     private var isVolUpPressed = false
     private var isVolDownPressed = false
+    private var volUpPassedDownToSystem = false
+    private var volDownPassedDownToSystem = false
+    private var chordFirstKeyDownCode = 0
     private var lastHardwareKeyEventTime: Long = 0
     private var lastRepeatVolumeStepTime: Long = 0
+
+    // Stuck-Key Safety Watchdog
+    private var stuckKeyWatchdogRunnable: Runnable? = null
+    private val STUCK_KEY_WATCHDOG_TIMEOUT_MS = 2500L
 
     // Deferral & Continuous Ramp
     private var pendingSinglePressRunnable: Runnable? = null
@@ -75,6 +82,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         var isServiceSuspended: Boolean = false
         var alwaysActiveEnabled: Boolean = true
         var nativeVolumePassthrough: Boolean = true
+        var autoCloudSyncEnabled: Boolean = true
         var testModeEnabled: Boolean = false
         var glyphReactionEnabled: Boolean = false
         var hapticReactionEnabled: Boolean = true
@@ -107,6 +115,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             isServiceSuspended = prefs.getBoolean("service_suspended", false)
             alwaysActiveEnabled = prefs.getBoolean("always_active", true)
             nativeVolumePassthrough = prefs.getBoolean("native_volume_passthrough", true)
+            autoCloudSyncEnabled = prefs.getBoolean("auto_cloud_sync", true)
             glyphReactionEnabled = prefs.getBoolean("glyph_reaction", false)
             hapticReactionEnabled = prefs.getBoolean("haptic_feedback", true)
             proximitySensorEnabled = prefs.getBoolean("proximity_pocket_guard", false)
@@ -274,6 +283,10 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             if (!isDualPressActive && !isSequenceActive) {
                 isVolUpPressed = false
                 isVolDownPressed = false
+                volUpPassedDownToSystem = false
+                volDownPassedDownToSystem = false
+                chordFirstKeyDownCode = 0
+                disarmStuckKeyWatchdog()
             }
         }
     }
@@ -282,6 +295,16 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         LogBuffer.log("Service interrupted")
         isVolUpPressed = false
         isVolDownPressed = false
+        volUpPassedDownToSystem = false
+        volDownPassedDownToSystem = false
+        isDualPressActive = false
+        isDualTokenEmitted = false
+        isHoldTriggered = false
+        chordFirstKeyDownCode = 0
+        disarmStuckKeyWatchdog()
+        cancelContinuousVolumeRamp()
+        cancelPendingSinglePress()
+        cancelPendingSequenceTap()
     }
 
     private fun isCallOrRingingActive(): Boolean {
@@ -358,8 +381,23 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         // Post-Action Cooldown: swallow any bouncing releases or trailing taps immediately following an executed gesture
         if (currentTime - lastActionExecuteTime < POST_ACTION_COOLDOWN_MS) {
             if (action == KeyEvent.ACTION_UP) {
-                if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) isVolUpPressed = false
-                if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) isVolDownPressed = false
+                val wasVolUp = (keyCode == KeyEvent.KEYCODE_VOLUME_UP)
+                if (wasVolUp) isVolUpPressed = false else isVolDownPressed = false
+
+                val wasPassed = if (wasVolUp) volUpPassedDownToSystem else volDownPassedDownToSystem
+                if (wasVolUp) volUpPassedDownToSystem = false else volDownPassedDownToSystem = false
+
+                if (!isVolUpPressed && !isVolDownPressed) {
+                    isDualPressActive = false
+                    isDualTokenEmitted = false
+                    isHoldTriggered = false
+                    chordFirstKeyDownCode = 0
+                    disarmStuckKeyWatchdog()
+                }
+
+                if (wasPassed && nativeVolumePassthrough) {
+                    return super.onKeyEvent(event)
+                }
             }
             return true
         }
@@ -380,11 +418,15 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             }
             isVolUpPressed = false
             isVolDownPressed = false
+            volUpPassedDownToSystem = false
+            volDownPassedDownToSystem = false
+            chordFirstKeyDownCode = 0
             isDualPressActive = false
             isDualTokenEmitted = false
             cancelContinuousVolumeRamp()
             cancelPendingSinglePress()
             cancelPendingSequenceTap()
+            disarmStuckKeyWatchdog()
             return false
         }
 
@@ -392,6 +434,12 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         wakeLock?.acquire(1000)
 
         if (action == KeyEvent.ACTION_DOWN) {
+            // Guard: If dual press is already active, consume ALL repeat/subsequent ACTION_DOWN events
+            // to prevent hardware repeat events from leaking through to Android and corrupting key state!
+            if (isDualPressActive) {
+                return true
+            }
+
             // Pause idle sequence timeout immediately whenever buttons are being pressed or held
             pendingSequenceTimeoutRunnable?.let { handler.removeCallbacks(it) }
             pendingSequenceTimeoutRunnable = null
@@ -432,11 +480,21 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                 isDualTokenEmitted = false
                 isHoldTriggered = false
 
-                // Compensate the 1-step volume change if native passthrough was used
+                // Compensate the 1-step volume change of whichever key was passed down to Android first
                 if (nativeVolumePassthrough) {
-                    val compDir = if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) AudioManager.ADJUST_LOWER else AudioManager.ADJUST_RAISE
-                    audioManager.adjustSuggestedStreamVolume(compDir, AudioManager.USE_DEFAULT_STREAM_TYPE, 0)
+                    val compDir = if (chordFirstKeyDownCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                        AudioManager.ADJUST_LOWER
+                    } else if (chordFirstKeyDownCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+                        AudioManager.ADJUST_RAISE
+                    } else {
+                        0
+                    }
+                    if (compDir != 0) {
+                        audioManager.adjustSuggestedStreamVolume(compDir, AudioManager.USE_DEFAULT_STREAM_TYPE, 0)
+                    }
                 }
+
+                armStuckKeyWatchdog()
 
                 // Start Dual Hold Timer (500ms) only if both keys are physically down
                 if (isVolUpPressed && isVolDownPressed) {
@@ -470,15 +528,21 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                     }
                 }
                 handler.postDelayed(activeHoldRunnable!!, HOLD_THRESHOLD_MS)
+                armStuckKeyWatchdog()
                 return true
             }
 
             // 3. Normal Volume Button Handling
             if (nativeVolumePassthrough) {
-                // Pass single keys directly through to Android input pipeline:
-                // - Instant Power + Vol Down Screenshot (zero delay, zero volume bar in screenshot)
-                // - Native continuous volume hold/ramping at hardware speed
-                // - Smooth OEM volume animations
+                if (chordFirstKeyDownCode == 0) {
+                    chordFirstKeyDownCode = keyCode
+                }
+                if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                    volUpPassedDownToSystem = true
+                } else {
+                    volDownPassedDownToSystem = true
+                }
+                armStuckKeyWatchdog()
                 return super.onKeyEvent(event)
             } else {
                 // Deferred Mode with Hold Support
@@ -502,6 +566,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
                 cancelPendingSinglePress()
                 scheduleDeferredSinglePress(keyCode)
+                armStuckKeyWatchdog()
                 return true
             }
 
@@ -526,10 +591,21 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                     LogBuffer.log("[INPUT] Token: DUAL")
                     appendTokenAndEvaluate("DUAL")
                 }
+
+                val wasPassed = if (wasVolUp) volUpPassedDownToSystem else volDownPassedDownToSystem
+                if (wasVolUp) volUpPassedDownToSystem = false else volDownPassedDownToSystem = false
+
                 if (!isVolUpPressed && !isVolDownPressed) {
                     isDualPressActive = false
                     isDualTokenEmitted = false
                     isHoldTriggered = false
+                    chordFirstKeyDownCode = 0
+                    disarmStuckKeyWatchdog()
+                }
+
+                // CRITICAL FIX: Deliver ACTION_UP to Android if ACTION_DOWN was sent, clearing Android's internal key state
+                if (wasPassed && nativeVolumePassthrough) {
+                    return super.onKeyEvent(event)
                 }
                 return true
             }
@@ -548,11 +624,23 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
                     handler.postDelayed(runnable, dualPressWindowMs + 15L)
                 }
                 isHoldTriggered = false
+                if (!isVolUpPressed && !isVolDownPressed) {
+                    disarmStuckKeyWatchdog()
+                }
                 return true
             }
 
             // 3. Normal Volume Key Release
             cancelContinuousVolumeRamp()
+            if (wasVolUp) {
+                volUpPassedDownToSystem = false
+            } else {
+                volDownPassedDownToSystem = false
+            }
+            if (!isVolUpPressed && !isVolDownPressed) {
+                chordFirstKeyDownCode = 0
+                disarmStuckKeyWatchdog()
+            }
             if (nativeVolumePassthrough) {
                 return super.onKeyEvent(event)
             }
@@ -629,6 +717,46 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
             handler.removeCallbacks(it)
             pendingSinglePressRunnable = null
             pendingSinglePressKeyCode = 0
+        }
+    }
+
+    private fun armStuckKeyWatchdog() {
+        disarmStuckKeyWatchdog()
+        stuckKeyWatchdogRunnable = Runnable {
+            val now = SystemClock.uptimeMillis()
+            val isAnyDown = isVolUpPressed || isVolDownPressed || volUpPassedDownToSystem || volDownPassedDownToSystem
+            val timeSinceLastKey = now - lastHardwareKeyEventTime
+            if (isAnyDown && timeSinceLastKey >= 2000L) {
+                LogBuffer.log("[WATCHDOG] Force-releasing stuck key state (Up=$isVolUpPressed, Down=$isVolDownPressed, Dual=$isDualPressActive, Passthrough=$volUpPassedDownToSystem/$volDownPassedDownToSystem)")
+                isVolUpPressed = false
+                isVolDownPressed = false
+                volUpPassedDownToSystem = false
+                volDownPassedDownToSystem = false
+                isDualPressActive = false
+                isDualTokenEmitted = false
+                isHoldTriggered = false
+                chordFirstKeyDownCode = 0
+                cancelContinuousVolumeRamp()
+                cancelPendingSinglePress()
+                cancelPendingSequenceTap()
+
+                if (autoCloudSyncEnabled) {
+                    CloudLogger.uploadLogs(
+                        context = this@VolumeTweakService,
+                        hoursAgo = 1,
+                        userNote = "Automated Watchdog Recovery: Hardware volume key state cleared after 2000ms idle",
+                        reason = "WATCHDOG_STUCK_KEY"
+                    )
+                }
+            }
+        }
+        handler.postDelayed(stuckKeyWatchdogRunnable!!, STUCK_KEY_WATCHDOG_TIMEOUT_MS)
+    }
+
+    private fun disarmStuckKeyWatchdog() {
+        stuckKeyWatchdogRunnable?.let {
+            handler.removeCallbacks(it)
+            stuckKeyWatchdogRunnable = null
         }
     }
 
@@ -717,8 +845,6 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
         cancelContinuousVolumeRamp()
         cancelPendingSinglePress()
         cancelPendingSequenceTap()
-        isVolUpPressed = false
-        isVolDownPressed = false
 
         if (glyphReactionEnabled) {
             GlyphController.pulse(1)
@@ -1049,6 +1175,7 @@ class VolumeTweakService : AccessibilityService(), SensorEventListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        disarmStuckKeyWatchdog()
         sensorManager?.unregisterListener(this)
         try {
             cameraCallback?.let { cameraManager?.unregisterAvailabilityCallback(it) }

@@ -159,11 +159,27 @@
                 style="@style/Widget.Material3.Button.TonalButton"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
+                android:layout_weight="0.8"
+                android:layout_marginEnd="6dp"
                 android:text="Cancel"
                 android:textColor="#AAAAAA"
                 app:backgroundTint="#1F1F1F"
+                app:cornerRadius="12dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnReportCloud"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1.2"
+                android:layout_marginEnd="6dp"
+                android:text="Upload Cloud"
+                android:textColor="#00E5FF"
+                android:textStyle="bold"
+                app:icon="@drawable/ic_cloud_upload"
+                app:iconTint="#00E5FF"
+                app:iconSize="16dp"
+                app:backgroundTint="#142429"
                 app:cornerRadius="12dp" />
 
             <com.google.android.material.button.MaterialButton
@@ -171,7 +187,7 @@
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_weight="1"
-                android:text="Share Report"
+                android:text="Share"
                 android:textColor="#FFFFFF"
                 android:textStyle="bold"
                 app:backgroundTint="#D71921"

@@ -84,6 +84,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var switchGlyph: MaterialSwitch
     private lateinit var switchAlwaysActive: MaterialSwitch
     private lateinit var switchNativePassthrough: MaterialSwitch
+    private lateinit var switchAutoCloudSync: MaterialSwitch
     private lateinit var switchTestMode: MaterialSwitch
     private lateinit var layoutWhitelistSelector: View
     private lateinit var tvWhitelistSummary: TextView
@@ -104,6 +105,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnClearLogs: View
     private lateinit var btnCopyLogs: View
     private lateinit var btnSendDiagnosticReport: View
+    private lateinit var btnUploadCloudLogs: View
+    private lateinit var layoutCloudStatusBar: View
+    private lateinit var tvCloudLogStatus: TextView
+    private lateinit var tvCloudLogAction: TextView
 
     private val monitorHandler = Handler(Looper.getMainLooper())
     private var monitorRunnable: Runnable? = null
@@ -166,6 +171,7 @@ class MainActivity : AppCompatActivity() {
         switchGlyph = findViewById(R.id.switchGlyph)
         switchAlwaysActive = findViewById(R.id.switchAlwaysActive)
         switchNativePassthrough = findViewById(R.id.switchNativePassthrough)
+        switchAutoCloudSync = findViewById(R.id.switchAutoCloudSync)
         switchTestMode = findViewById(R.id.switchTestMode)
         layoutWhitelistSelector = findViewById(R.id.layoutWhitelistSelector)
         tvWhitelistSummary = findViewById(R.id.tvWhitelistSummary)
@@ -186,6 +192,10 @@ class MainActivity : AppCompatActivity() {
         btnClearLogs = findViewById(R.id.btnClearLogs)
         btnCopyLogs = findViewById(R.id.btnCopyLogs)
         btnSendDiagnosticReport = findViewById(R.id.btnSendDiagnosticReport)
+        btnUploadCloudLogs = findViewById(R.id.btnUploadCloudLogs)
+        layoutCloudStatusBar = findViewById(R.id.layoutCloudStatusBar)
+        tvCloudLogStatus = findViewById(R.id.tvCloudLogStatus)
+        tvCloudLogAction = findViewById(R.id.tvCloudLogAction)
 
         val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
 
@@ -370,6 +380,16 @@ class MainActivity : AppCompatActivity() {
             LogBuffer.log("Native Pass-Through mode: ${if (isChecked) "ENABLED (Instant Screenshot & Fast Ramping)" else "DISABLED (Deferred mode)"}")
         }
 
+        // Auto Cloud Sync Switch
+        val isAutoCloudSync = prefs.getBoolean("auto_cloud_sync", true)
+        switchAutoCloudSync.isChecked = isAutoCloudSync
+        VolumeTweakService.autoCloudSyncEnabled = isAutoCloudSync
+        switchAutoCloudSync.setOnCheckedChangeListener { _, isChecked ->
+            prefs.edit().putBoolean("auto_cloud_sync", isChecked).apply()
+            VolumeTweakService.autoCloudSyncEnabled = isChecked
+            LogBuffer.log("Auto Cloud Sync: ${if (isChecked) "ENABLED (Glitch auto-upload active)" else "DISABLED"}")
+        }
+
         // Test Mode Switch
         val isTestMode = prefs.getBoolean("test_mode", false)
         switchTestMode.isChecked = isTestMode
@@ -428,6 +448,26 @@ class MainActivity : AppCompatActivity() {
         // Diagnostic Report Button
         btnSendDiagnosticReport.setOnClickListener {
             showDiagnosticReportDialog()
+        }
+
+        // Upload Cloud Logs Button
+        btnUploadCloudLogs.setOnClickListener {
+            triggerCloudLogUpload()
+        }
+
+        // Cloud Log Quick Status Bar
+        layoutCloudStatusBar.setOnClickListener {
+            val prefs = getSharedPreferences("volume_tweak_prefs", Context.MODE_PRIVATE)
+            val url = prefs.getString("last_cloud_log_url", null)
+            if (!url.isNullOrBlank()) {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Volume Tweak Cloud Log", url)
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this, "Cloud Log URL copied to clipboard!", Toast.LENGTH_SHORT).show()
+                showCloudLogSuccessDialog(url)
+            } else {
+                triggerCloudLogUpload()
+            }
         }
 
         // Theme Customization Controls
@@ -1354,6 +1394,7 @@ class MainActivity : AppCompatActivity() {
         val tvSummary = dialogView.findViewById<TextView>(R.id.tvReportLogSummary)
         val etNote = dialogView.findViewById<EditText>(R.id.etDiagnosticNote)
         val btnCancel = dialogView.findViewById<MaterialButton>(R.id.btnReportCancel)
+        val btnReportCloud = dialogView.findViewById<MaterialButton>(R.id.btnReportCloud)
         val btnSend = dialogView.findViewById<MaterialButton>(R.id.btnReportSend)
 
         var selectedHours: Int? = 24
@@ -1391,6 +1432,44 @@ class MainActivity : AppCompatActivity() {
 
         btnCancel.setOnClickListener { dialog.dismiss() }
 
+        btnReportCloud.setOnClickListener {
+            val userNote = etNote.text.toString().trim()
+            val progressDialog = AlertDialog.Builder(this)
+                .setTitle("Uploading to Cloud")
+                .setMessage("Uploading diagnostic log to cloud server...")
+                .setCancelable(false)
+                .create()
+            progressDialog.show()
+
+            CloudLogger.uploadLogs(
+                context = this,
+                hoursAgo = selectedHours,
+                userNote = userNote,
+                reason = "DIAGNOSTIC_DIALOG_UPLOAD",
+                callback = object : CloudLogger.UploadCallback {
+                    override fun onProgress(message: String) {
+                        progressDialog.setMessage(message)
+                    }
+
+                    override fun onSuccess(url: String) {
+                        progressDialog.dismiss()
+                        dialog.dismiss()
+                        refreshCloudLogStatusBar()
+                        showCloudLogSuccessDialog(url)
+                    }
+
+                    override fun onError(error: String) {
+                        progressDialog.dismiss()
+                        AlertDialog.Builder(this@MainActivity)
+                            .setTitle("Cloud Upload Failed")
+                            .setMessage(error)
+                            .setPositiveButton("OK", null)
+                            .show()
+                    }
+                }
+            )
+        }
+
         btnSend.setOnClickListener {
             val userNote = etNote.text.toString().trim()
             val reportText = LogBuffer.generateDiagnosticReport(this, selectedHours, userNote)
@@ -1408,9 +1487,88 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    private fun triggerCloudLogUpload() {
+        val progressDialog = AlertDialog.Builder(this)
+            .setTitle("Cloud Log Sync")
+            .setMessage("Snapshotting diagnostic report and uploading to cloud...")
+            .setCancelable(false)
+            .create()
+        progressDialog.show()
+
+        CloudLogger.uploadLogs(
+            context = this,
+            hoursAgo = 24,
+            userNote = "Manual 1-Tap Cloud Sync from Event Console",
+            reason = "CONSOLE_ONE_TAP",
+            callback = object : CloudLogger.UploadCallback {
+                override fun onProgress(message: String) {
+                    progressDialog.setMessage(message)
+                }
+
+                override fun onSuccess(url: String) {
+                    progressDialog.dismiss()
+                    refreshCloudLogStatusBar()
+                    showCloudLogSuccessDialog(url)
+                }
+
+                override fun onError(error: String) {
+                    progressDialog.dismiss()
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Cloud Upload Failed")
+                        .setMessage(error)
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
+        )
+    }
+
+    private fun showCloudLogSuccessDialog(url: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Cloud Log Generated")
+            .setMessage("Direct Cloud Log URL:\n\n$url\n\nLink copied to clipboard! You can share this URL directly with Antigravity to diagnose hardware events.")
+            .setPositiveButton("Copy Link") { _, _ ->
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("Volume Tweak Cloud Log", url)
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this, "Copied to clipboard!", Toast.LENGTH_SHORT).show()
+            }
+            .setNeutralButton("Open in Browser") { _, _ ->
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    startActivity(intent)
+                } catch (ignored: Exception) {}
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun refreshCloudLogStatusBar() {
+        val prefs = getSharedPreferences("volume_tweak_prefs", Context.MODE_PRIVATE)
+        val url = prefs.getString("last_cloud_log_url", null)
+        val time = prefs.getLong("last_cloud_log_time", 0L)
+        if (!url.isNullOrBlank() && time > 0L) {
+            val timeDiffSec = (System.currentTimeMillis() - time) / 1000
+            val timeStr = when {
+                timeDiffSec < 60 -> "Just now"
+                timeDiffSec < 3600 -> "${timeDiffSec / 60}m ago"
+                timeDiffSec < 86400 -> "${timeDiffSec / 3600}h ago"
+                else -> "${timeDiffSec / 86400}d ago"
+            }
+            tvCloudLogStatus.text = "Cloud Log: $url ($timeStr)"
+            tvCloudLogStatus.setTextColor(Color.parseColor("#00E5FF"))
+            tvCloudLogAction.visibility = View.VISIBLE
+        } else {
+            tvCloudLogStatus.text = "Cloud Sync: Ready (Tap cloud icon to upload & copy link)"
+            tvCloudLogStatus.setTextColor(Color.parseColor("#888888"))
+            tvCloudLogAction.visibility = View.GONE
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         updateServiceStatus()
+        refreshCloudLogStatusBar()
         startPerformanceMonitoring()
 
         LogBuffer.setListener { logList ->
